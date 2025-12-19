@@ -252,7 +252,7 @@ function ControllerVisualizer() {
            </div>
 
            {/* Live Data Overlay on Controller */}
-           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md rounded-xl p-4 border border-white/10 grid grid-cols-2 gap-x-8 gap-y-2 font-mono text-[10px] shadow-2xl">
+           <div className="absolute top-[340px] left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md rounded-xl p-4 border border-white/10 grid grid-cols-2 gap-x-8 gap-y-2 font-mono text-[10px] shadow-2xl w-full max-w-[280px]">
               <div className="text-emerald-500/70 font-bold">LX <span className="text-white ml-2">0.000</span></div>
               <div className="text-emerald-500/70 font-bold">LY <span className="text-white ml-2">0.000</span></div>
               <div className="text-blue-500/70 font-bold">RX <span className="text-white ml-2">0.000</span></div>
