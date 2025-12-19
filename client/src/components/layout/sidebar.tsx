@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import logoUrl from "@assets/mylogo_1766177546338.png";
 import { 
   LayoutDashboard, 
   Wand2, 
@@ -39,7 +40,13 @@ export function Sidebar() {
         <div className="flex flex-col h-full">
           {/* Logo Area */}
           <div className="h-20 flex items-center px-6 border-b border-sidebar-border/50">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center mr-3 text-black font-bold shadow-[0_0_15px_-3px_hsl(var(--primary)/0.5)]">CP</div>
+            <div className="w-10 h-10 mr-3 flex items-center justify-center">
+              <img 
+                src={logoUrl} 
+                alt="Logo" 
+                className="w-full h-full object-contain drop-shadow-[0_0_10px_rgba(16,185,129,0.4)]"
+              />
+            </div>
             <div>
               <div className="font-bold text-lg tracking-tight text-white leading-none mb-1">Ceil Pro</div>
               <div className="text-[10px] text-emerald-400 font-mono flex items-center gap-1.5">
