@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import InputTuning from "@/pages/input-tuning";
 import Enhancements from "@/pages/enhancements";
+import Profiles from "@/pages/profiles";
 
 function Router() {
   return (
@@ -14,6 +15,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/tuning" component={InputTuning} />
       <Route path="/enhancements" component={Enhancements} />
+      <Route path="/profiles" component={Profiles} />
       <Route component={NotFound} />
     </Switch>
   );
