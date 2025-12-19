@@ -161,26 +161,9 @@ function SystemStatus() {
   );
 }
 
+import generatedVideo from '@assets/generated_videos/cute_chibi_bunny_breathing_and_holding_boba.mp4'
+
 function ControllerVisualizer() {
-  // Animation loop for "breathing" effect or simulated input
-  const [stickLeft, setStickLeft] = useState({ x: 0, y: 0 });
-  const [stickRight, setStickRight] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Simulate slight idle movement
-      setStickLeft({ 
-        x: Math.sin(Date.now() / 1000) * 5, 
-        y: Math.cos(Date.now() / 1200) * 5 
-      });
-      setStickRight({ 
-        x: Math.sin(Date.now() / 1500) * 3, 
-        y: Math.cos(Date.now() / 1100) * 3 
-      });
-    }, 50);
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <Card className="h-full bg-[#0B0D14] border-border/50 p-1 flex flex-col relative overflow-hidden shadow-2xl">
       {/* Background Grid Effect */}
@@ -210,59 +193,29 @@ function ControllerVisualizer() {
       </div>
 
       {/* Visualization Area */}
-      <div className="flex-1 flex items-center justify-center relative">
-        {/* Silhouette - CSS Constructed for speed/cleanliness */}
-        <div className="relative w-[500px] h-[320px] scale-90 lg:scale-100 transition-transform duration-500">
-           {/* Main Body Shape */}
-           <div className="absolute inset-0 bg-[#0F111A] rounded-[80px_80px_140px_140px] shadow-[0_0_100px_-20px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.1)] border border-white/5 z-0"></div>
+      <div className="flex-1 flex flex-col items-center justify-center relative">
+        <div className="relative w-[500px] h-[320px] flex items-center justify-center">
+           <video 
+             src={generatedVideo} 
+             autoPlay 
+             loop 
+             muted 
+             playsInline
+             className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(16,185,129,0.2)]"
+           />
+        </div>
+
+        {/* Live Data Overlay on Controller */}
+        <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 border border-white/10 grid grid-cols-2 gap-x-8 gap-y-2 font-mono text-[10px] shadow-2xl w-full max-w-[280px] mt-4">
+           <div className="text-emerald-500/70 font-bold">LX <span className="text-white ml-2">0.000</span></div>
+           <div className="text-emerald-500/70 font-bold">LY <span className="text-white ml-2">0.000</span></div>
+           <div className="text-blue-500/70 font-bold">RX <span className="text-white ml-2">0.000</span></div>
+           <div className="text-blue-500/70 font-bold">RY <span className="text-white ml-2">0.000</span></div>
            
-           {/* Handles */}
-           <div className="absolute bottom-[-20px] left-[-20px] w-32 h-40 bg-[#0F111A] rounded-[40px] -rotate-12 z-[-1] shadow-xl border-l border-white/5"></div>
-           <div className="absolute bottom-[-20px] right-[-20px] w-32 h-40 bg-[#0F111A] rounded-[40px] rotate-12 z-[-1] shadow-xl border-r border-white/5"></div>
-
-           {/* Sticks Container */}
-           <div className="absolute top-[140px] left-[100px] w-24 h-24 rounded-full bg-black/40 border border-white/5 flex items-center justify-center shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
-             <motion.div 
-                className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-600 to-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.3),inset_0_-2px_4px_rgba(0,0,0,0.3)] border border-emerald-400/30"
-                animate={{ x: stickLeft.x, y: stickLeft.y }}
-             />
-           </div>
-
-           <div className="absolute top-[140px] right-[100px] w-24 h-24 rounded-full bg-black/40 border border-white/5 flex items-center justify-center shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
-              <motion.div 
-                className="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 to-blue-400 shadow-[0_0_25px_rgba(59,130,246,0.3),inset_0_-2px_4px_rgba(0,0,0,0.3)] border border-blue-400/30"
-                animate={{ x: stickRight.x, y: stickRight.y }}
-              />
-           </div>
-
-           {/* Buttons */}
-           <div className="absolute top-[80px] right-[90px] grid grid-cols-2 gap-3 opacity-80">
-              <div className="w-3 h-3 rounded-full bg-white/20 shadow-[0_0_5px_rgba(255,255,255,0.1)]"></div>
-              <div className="w-3 h-3 rounded-full bg-white/20 shadow-[0_0_5px_rgba(255,255,255,0.1)]"></div>
-              <div className="w-3 h-3 rounded-full bg-white/20 shadow-[0_0_5px_rgba(255,255,255,0.1)]"></div>
-              <div className="w-3 h-3 rounded-full bg-white/20 shadow-[0_0_5px_rgba(255,255,255,0.1)]"></div>
-           </div>
+           <div className="col-span-2 h-px bg-white/10 my-1"></div>
            
-           {/* D-Pad */}
-           <div className="absolute top-[80px] left-[90px] opacity-50">
-              <div className="w-12 h-12 relative">
-                <div className="absolute top-0 left-4 w-4 h-12 bg-white/20 rounded-sm"></div>
-                <div className="absolute top-4 left-0 w-12 h-4 bg-white/20 rounded-sm"></div>
-              </div>
-           </div>
-
-           {/* Live Data Overlay on Controller */}
-           <div className="absolute top-[340px] left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md rounded-xl p-4 border border-white/10 grid grid-cols-2 gap-x-8 gap-y-2 font-mono text-[10px] shadow-2xl w-full max-w-[280px]">
-              <div className="text-emerald-500/70 font-bold">LX <span className="text-white ml-2">0.000</span></div>
-              <div className="text-emerald-500/70 font-bold">LY <span className="text-white ml-2">0.000</span></div>
-              <div className="text-blue-500/70 font-bold">RX <span className="text-white ml-2">0.000</span></div>
-              <div className="text-blue-500/70 font-bold">RY <span className="text-white ml-2">0.000</span></div>
-              
-              <div className="col-span-2 h-px bg-white/10 my-1"></div>
-              
-              <div className="text-muted-foreground">LT <span className="text-white ml-2">0%</span></div>
-              <div className="text-muted-foreground">RT <span className="text-white ml-2">0%</span></div>
-           </div>
+           <div className="text-muted-foreground">LT <span className="text-white ml-2">0%</span></div>
+           <div className="text-muted-foreground">RT <span className="text-white ml-2">0%</span></div>
         </div>
       </div>
 
