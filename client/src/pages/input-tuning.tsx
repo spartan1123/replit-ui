@@ -163,185 +163,179 @@ export default function InputTuning() {
       </div>
 
       {/* Main Content */}
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left Column */}
-        <div className="col-span-12 lg:col-span-8 space-y-6">
-          {/* Profile Management */}
-          <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
-            <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Profile Management</h3>
-            <div className="flex gap-3">
-              <select className="flex-1 px-4 py-2.5 bg-black/40 border border-border rounded-lg text-white text-sm focus:outline-none focus:border-primary">
-                <option>Select profile...</option>
-                <option>Default</option>
-                <option>Competitive</option>
-                <option>Casual</option>
-              </select>
-              <Button variant="outline" size="sm" className="gap-2">
-                📥 Load
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2 text-red-400 hover:text-red-300">
-                🗑️ Delete
-              </Button>
-            </div>
-          </Card>
-
-          {/* Runtime Mapping */}
-          <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-white text-sm uppercase tracking-wide">Runtime Mapping</h3>
-              <Button className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs" size="sm">
-                Apply
-              </Button>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
-                <div>
-                  <p className="text-xs font-medium text-white">Invert Y (L/R)</p>
-                  <p className="text-[10px] text-muted-foreground">Flip Y-axis for L/R sticks</p>
-                </div>
-                <ToggleSwitch enabled={false} onChange={() => {}} />
-              </div>
-              <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
-                <div>
-                  <p className="text-xs font-medium text-white">Invert Y (Game Output)</p>
-                  <p className="text-[10px] text-muted-foreground">Flip Y-axis for camera output</p>
-                </div>
-                <ToggleSwitch enabled={false} onChange={() => {}} />
-              </div>
-              <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
-                <div>
-                  <p className="text-xs font-medium text-white">Prefer Analog Triggers</p>
-                  <p className="text-[10px] text-muted-foreground">Use analog for L2/R2 instead of binary</p>
-                </div>
-                <ToggleSwitch enabled={true} onChange={() => {}} />
-              </div>
-            </div>
-          </Card>
-
-          {/* Sticks & Triggers */}
-          <div className="grid grid-cols-3 gap-6">
-            {/* Left Stick */}
-            <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
-              <StickVisualizer
-                label="Left Stick"
-                innerDeadzone={tuning.leftStick.innerDeadzone}
-                outerDeadzone={tuning.leftStick.outerDeadzone}
-              />
-              <div className="mt-6 space-y-4">
-                <SliderControl
-                  label="Inner Deadzone"
-                  value={tuning.leftStick.innerDeadzone}
-                  onChange={(v) => setTuning({ ...tuning, leftStick: { ...tuning.leftStick, innerDeadzone: v } })}
-                  min={0}
-                  max={1}
-                  displayValue={(tuning.leftStick.innerDeadzone * 100).toFixed(0) + "%"}
-                />
-                <SliderControl
-                  label="Outer Deadzone"
-                  value={tuning.leftStick.outerDeadzone}
-                  onChange={(v) => setTuning({ ...tuning, leftStick: { ...tuning.leftStick, outerDeadzone: v } })}
-                  min={0}
-                  max={1}
-                  displayValue={(tuning.leftStick.outerDeadzone * 100).toFixed(0) + "%"}
-                />
-                <SliderControl
-                  label="Sensitivity"
-                  value={tuning.leftStick.sensitivity}
-                  onChange={(v) => setTuning({ ...tuning, leftStick: { ...tuning.leftStick, sensitivity: v } })}
-                  min={0}
-                  max={2}
-                />
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Response Curve</label>
-                  <select className="w-full px-3 py-2 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary">
-                    <option>Linear</option>
-                    <option>Cubic</option>
-                    <option>Custom</option>
-                  </select>
-                </div>
-              </div>
-            </Card>
-
-            {/* Right Stick */}
-            <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
-              <StickVisualizer
-                label="Right Stick"
-                innerDeadzone={tuning.rightStick.innerDeadzone}
-                outerDeadzone={tuning.rightStick.outerDeadzone}
-              />
-              <div className="mt-6 space-y-4">
-                <SliderControl
-                  label="Inner Deadzone"
-                  value={tuning.rightStick.innerDeadzone}
-                  onChange={(v) => setTuning({ ...tuning, rightStick: { ...tuning.rightStick, innerDeadzone: v } })}
-                  min={0}
-                  max={1}
-                  displayValue={(tuning.rightStick.innerDeadzone * 100).toFixed(0) + "%"}
-                />
-                <SliderControl
-                  label="Outer Deadzone"
-                  value={tuning.rightStick.outerDeadzone}
-                  onChange={(v) => setTuning({ ...tuning, rightStick: { ...tuning.rightStick, outerDeadzone: v } })}
-                  min={0}
-                  max={1}
-                  displayValue={(tuning.rightStick.outerDeadzone * 100).toFixed(0) + "%"}
-                />
-                <SliderControl
-                  label="Sensitivity"
-                  value={tuning.rightStick.sensitivity}
-                  onChange={(v) => setTuning({ ...tuning, rightStick: { ...tuning.rightStick, sensitivity: v } })}
-                  min={0}
-                  max={2}
-                />
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Response Curve</label>
-                  <select className="w-full px-3 py-2 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary">
-                    <option>Linear</option>
-                    <option>Cubic</option>
-                    <option>Custom</option>
-                  </select>
-                </div>
-              </div>
-            </Card>
-
-            {/* Triggers */}
-            <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
-              <h4 className="text-sm font-semibold text-emerald-400 mb-4 flex items-center gap-2">
-                <Zap className="w-4 h-4" />
-                Triggers
-              </h4>
-              <div className="space-y-4">
-                <SliderControl
-                  label="L2 Deadzone"
-                  value={tuning.triggers.d12}
-                  onChange={(v) => setTuning({ ...tuning, triggers: { ...tuning.triggers, d12: v } })}
-                  min={0}
-                  max={100}
-                  displayValue={(tuning.triggers.d12 * 100).toFixed(0) + "%"}
-                />
-                <SliderControl
-                  label="R2 Deadzone"
-                  value={tuning.triggers.s1n5}
-                  onChange={(v) => setTuning({ ...tuning, triggers: { ...tuning.triggers, s1n5: v } })}
-                  min={0}
-                  max={100}
-                  displayValue={(tuning.triggers.s1n5 * 100).toFixed(0) + "%"}
-                />
-                <SliderControl
-                  label="Trigger Sensitivity"
-                  value={tuning.triggers.s3n3}
-                  onChange={(v) => setTuning({ ...tuning, triggers: { ...tuning.triggers, s3n3: v } })}
-                  min={0}
-                  max={100}
-                  displayValue={(tuning.triggers.s3n3 * 100).toFixed(0) + "%"}
-                />
-              </div>
-            </Card>
+      <div className="space-y-6">
+        {/* Profile Management */}
+        <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
+          <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Profile Management</h3>
+          <div className="flex gap-3">
+            <select className="flex-1 px-4 py-2.5 bg-black/40 border border-border rounded-lg text-white text-sm focus:outline-none focus:border-primary">
+              <option>Select profile...</option>
+              <option>Default</option>
+              <option>Competitive</option>
+              <option>Casual</option>
+            </select>
+            <Button variant="outline" size="sm" className="gap-2">
+              📥 Load
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2 text-red-400 hover:text-red-300">
+              🗑️ Delete
+            </Button>
           </div>
-        </div>
+        </Card>
 
-        {/* Right Column - Empty for now */}
-        <div className="col-span-12 lg:col-span-4"></div>
+        {/* Runtime Mapping */}
+        <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-white text-sm uppercase tracking-wide">Runtime Mapping</h3>
+            <Button className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs" size="sm">
+              Apply
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
+              <div>
+                <p className="text-xs font-medium text-white">Invert Y (L/R)</p>
+                <p className="text-[10px] text-muted-foreground">Flip Y-axis for L/R sticks</p>
+              </div>
+              <ToggleSwitch enabled={false} onChange={() => {}} />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
+              <div>
+                <p className="text-xs font-medium text-white">Invert Y (Game Output)</p>
+                <p className="text-[10px] text-muted-foreground">Flip Y-axis for camera output</p>
+              </div>
+              <ToggleSwitch enabled={false} onChange={() => {}} />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
+              <div>
+                <p className="text-xs font-medium text-white">Prefer Analog Triggers</p>
+                <p className="text-[10px] text-muted-foreground">Use analog for L2/R2 instead of binary</p>
+              </div>
+              <ToggleSwitch enabled={true} onChange={() => {}} />
+            </div>
+          </div>
+        </Card>
+
+        {/* Sticks & Triggers */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {/* Left Stick */}
+          <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
+            <StickVisualizer
+              label="Left Stick"
+              innerDeadzone={tuning.leftStick.innerDeadzone}
+              outerDeadzone={tuning.leftStick.outerDeadzone}
+            />
+            <div className="mt-6 space-y-4">
+              <SliderControl
+                label="Inner Deadzone"
+                value={tuning.leftStick.innerDeadzone}
+                onChange={(v) => setTuning({ ...tuning, leftStick: { ...tuning.leftStick, innerDeadzone: v } })}
+                min={0}
+                max={1}
+                displayValue={(tuning.leftStick.innerDeadzone * 100).toFixed(0) + "%"}
+              />
+              <SliderControl
+                label="Outer Deadzone"
+                value={tuning.leftStick.outerDeadzone}
+                onChange={(v) => setTuning({ ...tuning, leftStick: { ...tuning.leftStick, outerDeadzone: v } })}
+                min={0}
+                max={1}
+                displayValue={(tuning.leftStick.outerDeadzone * 100).toFixed(0) + "%"}
+              />
+              <SliderControl
+                label="Sensitivity"
+                value={tuning.leftStick.sensitivity}
+                onChange={(v) => setTuning({ ...tuning, leftStick: { ...tuning.leftStick, sensitivity: v } })}
+                min={0}
+                max={2}
+              />
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Response Curve</label>
+                <select className="w-full px-3 py-2 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary">
+                  <option>Linear</option>
+                  <option>Cubic</option>
+                  <option>Custom</option>
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Right Stick */}
+          <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
+            <StickVisualizer
+              label="Right Stick"
+              innerDeadzone={tuning.rightStick.innerDeadzone}
+              outerDeadzone={tuning.rightStick.outerDeadzone}
+            />
+            <div className="mt-6 space-y-4">
+              <SliderControl
+                label="Inner Deadzone"
+                value={tuning.rightStick.innerDeadzone}
+                onChange={(v) => setTuning({ ...tuning, rightStick: { ...tuning.rightStick, innerDeadzone: v } })}
+                min={0}
+                max={1}
+                displayValue={(tuning.rightStick.innerDeadzone * 100).toFixed(0) + "%"}
+              />
+              <SliderControl
+                label="Outer Deadzone"
+                value={tuning.rightStick.outerDeadzone}
+                onChange={(v) => setTuning({ ...tuning, rightStick: { ...tuning.rightStick, outerDeadzone: v } })}
+                min={0}
+                max={1}
+                displayValue={(tuning.rightStick.outerDeadzone * 100).toFixed(0) + "%"}
+              />
+              <SliderControl
+                label="Sensitivity"
+                value={tuning.rightStick.sensitivity}
+                onChange={(v) => setTuning({ ...tuning, rightStick: { ...tuning.rightStick, sensitivity: v } })}
+                min={0}
+                max={2}
+              />
+              <div>
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Response Curve</label>
+                <select className="w-full px-3 py-2 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary">
+                  <option>Linear</option>
+                  <option>Cubic</option>
+                  <option>Custom</option>
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Triggers */}
+          <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
+            <h4 className="text-sm font-semibold text-emerald-400 mb-4 flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              Triggers
+            </h4>
+            <div className="space-y-4">
+              <SliderControl
+                label="L2 Deadzone"
+                value={tuning.triggers.d12}
+                onChange={(v) => setTuning({ ...tuning, triggers: { ...tuning.triggers, d12: v } })}
+                min={0}
+                max={100}
+                displayValue={(tuning.triggers.d12 * 100).toFixed(0) + "%"}
+              />
+              <SliderControl
+                label="R2 Deadzone"
+                value={tuning.triggers.s1n5}
+                onChange={(v) => setTuning({ ...tuning, triggers: { ...tuning.triggers, s1n5: v } })}
+                min={0}
+                max={100}
+                displayValue={(tuning.triggers.s1n5 * 100).toFixed(0) + "%"}
+              />
+              <SliderControl
+                label="Trigger Sensitivity"
+                value={tuning.triggers.s3n3}
+                onChange={(v) => setTuning({ ...tuning, triggers: { ...tuning.triggers, s3n3: v } })}
+                min={0}
+                max={100}
+                displayValue={(tuning.triggers.s3n3 * 100).toFixed(0) + "%"}
+              />
+            </div>
+          </Card>
+        </div>
       </div>
     </Shell>
   );
