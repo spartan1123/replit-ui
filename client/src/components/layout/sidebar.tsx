@@ -40,7 +40,7 @@ export function Sidebar() {
         <div className="flex flex-col h-full">
           {/* Logo Area */}
           <div className="h-20 flex items-center px-6 border-b border-sidebar-border/50">
-            <div className="w-10 h-10 mr-3 flex items-center justify-center">
+            <div className="w-12 h-12 mr-3 flex items-center justify-center">
               <img 
                 src={logoUrl} 
                 alt="Logo" 
