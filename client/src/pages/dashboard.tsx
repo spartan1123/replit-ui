@@ -161,7 +161,7 @@ function SystemStatus() {
   );
 }
 
-import generatedVideo from '@assets/generated_videos/cute_chibi_bunny_breathing_and_holding_boba.mp4'
+import generatedVideo from '@assets/generated_videos/chibi_bunny_idle_animation_on_solid_black_background.mp4'
 
 function ControllerVisualizer() {
   return (
@@ -201,7 +201,7 @@ function ControllerVisualizer() {
              loop 
              muted 
              playsInline
-             className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(16,185,129,0.2)]"
+             className="w-full h-full object-contain mix-blend-screen drop-shadow-[0_0_30px_rgba(16,185,129,0.2)]"
            />
         </div>
 
