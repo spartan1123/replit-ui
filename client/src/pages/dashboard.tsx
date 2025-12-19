@@ -161,7 +161,7 @@ function SystemStatus() {
   );
 }
 
-import generatedVideo from '@assets/generated_videos/chibi_bunny_idle_animation_on_solid_black_background.mp4'
+import controllerImage from '@assets/real_love_1766176059550.png'
 
 function ControllerVisualizer() {
   return (
@@ -193,20 +193,17 @@ function ControllerVisualizer() {
       </div>
 
       {/* Visualization Area */}
-      <div className="flex-1 flex flex-col items-center justify-center relative">
-        <div className="relative w-[500px] h-[320px] flex items-center justify-center">
-           <video 
-             src={generatedVideo} 
-             autoPlay 
-             loop 
-             muted 
-             playsInline
-             className="w-full h-full object-contain mix-blend-screen drop-shadow-[0_0_30px_rgba(16,185,129,0.2)]"
+      <div className="flex-1 flex flex-col items-center justify-center relative p-8">
+        <div className="relative w-full h-full max-h-[400px] flex items-center justify-center">
+           <img 
+             src={controllerImage} 
+             alt="Controller Visualization"
+             className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(16,185,129,0.2)]"
            />
         </div>
 
         {/* Live Data Overlay on Controller */}
-        <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 border border-white/10 grid grid-cols-2 gap-x-8 gap-y-2 font-mono text-[10px] shadow-2xl w-full max-w-[280px] mt-4">
+        <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 border border-white/10 grid grid-cols-2 gap-x-8 gap-y-2 font-mono text-[10px] shadow-2xl w-full max-w-[280px] mt-4 z-20">
            <div className="text-emerald-500/70 font-bold">LX <span className="text-white ml-2">0.000</span></div>
            <div className="text-emerald-500/70 font-bold">LY <span className="text-white ml-2">0.000</span></div>
            <div className="text-blue-500/70 font-bold">RX <span className="text-white ml-2">0.000</span></div>
