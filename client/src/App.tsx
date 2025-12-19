@@ -6,12 +6,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import InputTuning from "@/pages/input-tuning";
+import Enhancements from "@/pages/enhancements";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/tuning" component={InputTuning} />
+      <Route path="/enhancements" component={Enhancements} />
       <Route component={NotFound} />
     </Switch>
   );
