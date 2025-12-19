@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Settings2, Plus, RefreshCw, Import, Download, Search, FileJson, Copy, Trash2, Edit2, Play } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Card } from "@/components/ui/card";
@@ -43,6 +44,7 @@ const MOCK_PROFILES: Profile[] = [
 
 export default function Profiles() {
   const [selectedProfileId, setSelectedProfileId] = useState<string>("1");
+  const [, setLocation] = useLocation();
   const selectedProfile = MOCK_PROFILES.find(p => p.id === selectedProfileId);
 
   return (
@@ -167,7 +169,11 @@ export default function Profiles() {
                            <Play className="w-4 h-4 fill-current" />
                            Apply Profile
                         </Button>
-                        <Button variant="outline" className="border-white/10 bg-white/5 hover:bg-white/10 text-white gap-2 h-12 text-sm">
+                        <Button 
+                          variant="outline" 
+                          className="border-white/10 bg-white/5 hover:bg-white/10 text-white gap-2 h-12 text-sm"
+                          onClick={() => setLocation("/tuning")}
+                        >
                            <Edit2 className="w-4 h-4" />
                            Edit Settings
                         </Button>
