@@ -27,7 +27,6 @@ interface EnhancementsState {
   rapidFire: {
     fireRateMultiplier: number;
     humanizationLevel: number;
-    jamProbability: number;
     heatSimulation: number;
     burstMode: boolean;
     adaptiveTiming: boolean;
@@ -120,7 +119,6 @@ export default function Enhancements() {
     rapidFire: {
       fireRateMultiplier: 1.8,
       humanizationLevel: 4.5,
-      jamProbability: 0.0,
       heatSimulation: 0.5,
       burstMode: false,
       adaptiveTiming: true,
@@ -336,13 +334,6 @@ export default function Enhancements() {
               onChange={(v) => setState({ ...state, rapidFire: { ...state.rapidFire, humanizationLevel: v } })}
               min={0}
               max={10}
-            />
-            <SliderControl
-              label="Jam Probability"
-              value={state.rapidFire.jamProbability}
-              onChange={(v) => setState({ ...state, rapidFire: { ...state.rapidFire, jamProbability: v } })}
-              min={0}
-              max={1}
             />
             <SliderControl
               label="Heat Simulation"
