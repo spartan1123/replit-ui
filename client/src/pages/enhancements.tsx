@@ -100,7 +100,8 @@ function SettingToggle({ label, description, enabled, onChange, activeStatus }: 
 }
 
 export default function Enhancements() {
-  const [state, setState] = useState<EnhancementsState>({
+  // Default state constant for reuse
+  const DEFAULT_STATE: EnhancementsState = {
     slot: 0,
     smartTriggerFlip: false,
     aimAssist: {
@@ -137,19 +138,36 @@ export default function Enhancements() {
       fatigueSimulation: true,
       enabled: true
     }
+  };
+
+  const [state, setState] = useState<EnhancementsState>(() => {
+    // 1c) Load initial state from localStorage before render
+    try {
+      const saved = localStorage.getItem("ceilpro.enhancements.slot.0");
+      if (saved) {
+        return { ...DEFAULT_STATE, ...JSON.parse(saved), slot: 0 };
+      }
+    } catch (e) {
+      console.error("Failed to load initial state", e);
+    }
+    return DEFAULT_STATE;
   });
 
   const [hosted] = useState(isHosted());
 
-  // Debounced sending
+  // Debounced sending and saving
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 1e) Save on changes with debounce
   useEffect(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
     timeoutRef.current = setTimeout(() => {
+      // Save to localStorage
+      localStorage.setItem(`ceilpro.enhancements.slot.${state.slot}`, JSON.stringify(state));
+
       // Map mode to valid host values
       let aimMode = "Magnetic";
       if (state.aimAssist.mode === "Sticky") aimMode = "Magnetic";
@@ -208,6 +226,21 @@ export default function Enhancements() {
     };
   }, [state]);
 
+  const handleSlotChange = (newSlot: number) => {
+    // 1d) Load slot state immediately
+    try {
+      const saved = localStorage.getItem(`ceilpro.enhancements.slot.${newSlot}`);
+      if (saved) {
+        setState({ ...DEFAULT_STATE, ...JSON.parse(saved), slot: newSlot });
+      } else {
+        setState({ ...DEFAULT_STATE, slot: newSlot });
+      }
+    } catch (e) {
+      console.error("Failed to load slot state", e);
+      setState({ ...DEFAULT_STATE, slot: newSlot });
+    }
+  };
+
   const handleResetOverride = (slot: number) => {
     postToHost({
       type: "CLEAR_ENHANCEMENTS_OVERRIDE",
@@ -252,7 +285,7 @@ export default function Enhancements() {
                 <select 
                   className="bg-transparent text-xs text-white focus:outline-none"
                   value={state.slot}
-                  onChange={(e) => setState({ ...state, slot: parseInt(e.target.value) })}
+                  onChange={(e) => handleSlotChange(parseInt(e.target.value))}
                 >
                   <option value={0}>Slot 1</option>
                   <option value={1}>Slot 2</option>

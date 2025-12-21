@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sliders, Zap, Users, Flame, Cpu } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { postToHost } from "@/lib/hostBridge";
 
 interface TuningState {
   leftStick: {
@@ -138,7 +139,7 @@ function SettingToggle({ label, description, enabled, onChange, activeStatus }: 
 }
 
 export default function InputTuning() {
-  const [tuning, setTuning] = useState<TuningState>({
+  const DEFAULT_TUNING: TuningState = {
     leftStick: { innerDeadzone: 0.15, outerDeadzone: 0.95, sensitivity: 1.0, responseCurve: "linear" },
     rightStick: { innerDeadzone: 0.15, outerDeadzone: 0.95, sensitivity: 1.0, responseCurve: "linear" },
     triggers: { d12: 0.0, s1n5: 0.8, s3n3: 0.5 },
@@ -161,7 +162,32 @@ export default function InputTuning() {
       invertYGameOutput: false,
       preferAnalogTriggers: true,
     }
+  };
+
+  const [tuning, setTuning] = useState<TuningState>(() => {
+    try {
+      const saved = localStorage.getItem("ceilpro.input.tuning");
+      if (saved) {
+        return { ...DEFAULT_TUNING, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.error("Failed to load tuning state", e);
+    }
+    return DEFAULT_TUNING;
   });
+
+  // Save to localStorage on change
+  useEffect(() => {
+    localStorage.setItem("ceilpro.input.tuning", JSON.stringify(tuning));
+  }, [tuning]);
+
+  const handleApply = () => {
+    postToHost({
+      type: "APPLY_INPUT_TUNING",
+      payload: tuning
+    });
+    toast.success("Input tuning configuration applied");
+  };
 
   return (
     <Shell>
@@ -214,7 +240,11 @@ export default function InputTuning() {
         <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold text-white text-sm uppercase tracking-wide">Runtime Mapping</h3>
-            <Button className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs" size="sm">
+            <Button 
+              className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs" 
+              size="sm"
+              onClick={handleApply}
+            >
               Apply
             </Button>
           </div>
