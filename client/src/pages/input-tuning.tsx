@@ -203,7 +203,7 @@ export default function InputTuning() {
       
       timeoutRef.current = setTimeout(() => {
         postToHost({
-          type: "APPLY_INPUT_TUNING",
+          type: "PREVIEW_AXIS_CONFIG",
           payload: tuning
         });
       }, 100);
@@ -218,7 +218,7 @@ export default function InputTuning() {
 
   const handleApply = () => {
     postToHost({
-      type: "APPLY_INPUT_TUNING",
+      type: "APPLY_AXIS_CONFIG",
       payload: tuning
     });
     setIsDirty(false);
