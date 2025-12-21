@@ -1,0 +1,118 @@
+We are embedding this React UI inside a Windows .exe using WebView2 (DS4Windows). The UI must send runtime enhancement updates to the host app via window.chrome.webview.postMessage.
+
+Implement the following changes across the Replit React app (no placeholders, real code):
+
+GOAL:
+- When user changes ANY enhancement toggle/slider, the app sends an UPDATE_ENHANCEMENTS message to the WebView2 host.
+- Message must match the EXACT C# WebBridge contract (type + payload).
+- Add slot selection (0..3) and include slot in payload.
+- Add debounce (75–150ms) so slider drag doesn’t spam.
+- Add an explicit “Reset Override” button that sends CLEAR_ENHANCEMENTS_OVERRIDE for the selected slot, and another optional “Reset All Overrides” that sends slot:-1.
+
+1) TRANSPORT LAYER (WebView2)
+Create a small helper module (e.g., client/src/lib/hostBridge.ts) that exports:
+- isHosted(): boolean  // returns true if window.chrome.webview.postMessage exists
+- postToHost(message: any): void  // calls window.chrome.webview.postMessage(message) if hosted, else console.warn
+Also add a dev fallback:
+- If not hosted, log the outgoing message to console so we can test in browser.
+
+2) UI: SLOT SELECTOR
+Add a slot selector to the Enhancements page UI:
+- Label: “Controller Slot”
+- Options: Slot 1, Slot 2, Slot 3, Slot 4
+- Internally store selectedSlot as 0..3
+Default: 0
+
+3) DATA SHAPE ALIGNMENT (IMPORTANT)
+The current UI state uses aimAssist / weaponPreset / reactionTime / inputNoise etc.
+We MUST send the host payload in this exact shape and field names:
+
+{
+  type: "UPDATE_ENHANCEMENTS",
+  payload: {
+    slot: <0..3>,
+    smartTriggerFlip: <boolean>,
+    aim: {
+      enabled: <boolean>,
+      strength: <float 0..1>,
+      radius: <float 0..100>,
+      stickiness: <float 0..1>,
+      mode: <"Magnetic" | "Linear" | "Elastic">,
+      prediction: <boolean>
+    },
+    recoil: {
+      enabled: <boolean>,
+      vertical: <float 0..1>,
+      horizontal: <float 0..1>,
+      strength: <float>,
+      adaptationRate: <float 0..1>,
+      preset: <string>,
+      prediction: <boolean>,
+      patternLearning: <boolean>
+    },
+    rapidFire: {
+      enabled: <boolean>,
+      fireRateMultiplier: <float>,
+      humanizationLevel: <float>,
+      heatSimulation: <float 0..1>,
+      burstMode: <boolean>,
+      adaptiveTiming: <boolean>
+    },
+    humanization: {
+      enabled: <boolean>,
+      varianceLevel: <float>,
+      errorRate: <float>,
+      reactionTimeVariation: <float>,
+      inputNoiseLevel: <float>,
+      fatigueSimulation: <boolean>
+    }
+  }
+}
+
+CRITICAL MAPPINGS:
+- If UI has recoil.vertical/horizontal as 0–100, convert to 0–1 in outgoing payload (divide by 100).
+- Rename:
+  aimAssist -> aim
+  weaponPreset -> preset
+  reactionTime -> reactionTimeVariation
+  inputNoise -> inputNoiseLevel
+- Enum mapping:
+  UI currently uses "Magnetic" | "Sticky" | "Dynamic" etc.
+  Host only accepts "Magnetic" | "Linear" | "Elastic".
+  Implement a safe mapping function:
+    - "Magnetic" -> "Magnetic"
+    - "Sticky" -> "Magnetic" (fallback)
+    - "Dynamic" -> "Elastic" (fallback)
+    - anything else -> "Magnetic"
+
+4) DEBOUNCED SENDING
+Implement debounced sending so updates send at most every ~100ms during slider drag:
+- On any enhancement state change OR slot change, schedule sending the latest payload after 100ms.
+- If another change happens within 100ms, cancel and reschedule.
+- Use useEffect + setTimeout/clearTimeout (no external deps required).
+
+5) CLEAR OVERRIDE COMMAND
+Add buttons in the Enhancements page:
+- “Reset Override (This Slot)” -> sends:
+  { type: "CLEAR_ENHANCEMENTS_OVERRIDE", payload: { slot: selectedSlot } }
+- Optional “Reset Override (All Slots)” -> sends:
+  { type: "CLEAR_ENHANCEMENTS_OVERRIDE", payload: { slot: -1 } }
+
+6) SMART TRIGGER FLIP TOGGLE
+Ensure the page includes a toggle for smartTriggerFlip (boolean).
+If it exists under another name, rename state and UI label to “Smart Trigger Flip”.
+
+7) SAFE HOST DETECTION BANNER
+At top of enhancements page show a small status text:
+- If hosted: “Connected to DS4Windows”
+- If not hosted: “Not hosted (browser mode) — messages will log to console”
+
+8) NO JAM PROBABILITY
+Ensure there is NO JamProbability anywhere in UI state, message payload, or controls.
+
+After implementing, output:
+- The files changed with paths
+- The exact outgoing message example for Slot 1 with some sample settings
+- Any assumptions you made
+
+Do NOT invent backend servers. Do NOT add WebSockets. Use only WebView2 postMessage.

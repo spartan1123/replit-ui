@@ -1,11 +1,14 @@
-import { useState } from "react";
-import { Target, Zap, Users, Flame, Cpu, Shield, Crosshair, RefreshCcw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Target, Zap, Users, Flame, Cpu, Shield, Crosshair, RefreshCcw, Gamepad2 } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { isHosted, postToHost } from "@/lib/hostBridge";
 
 interface EnhancementsState {
+  slot: number;
+  smartTriggerFlip: boolean;
   aimAssist: {
     strength: number;
     radius: number;
@@ -98,6 +101,8 @@ function SettingToggle({ label, description, enabled, onChange, activeStatus }: 
 
 export default function Enhancements() {
   const [state, setState] = useState<EnhancementsState>({
+    slot: 0,
+    smartTriggerFlip: false,
     aimAssist: {
       strength: 0.8,
       radius: 50.0,
@@ -134,24 +139,135 @@ export default function Enhancements() {
     }
   });
 
+  const [hosted] = useState(isHosted());
+
+  // Debounced sending
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      // Map mode to valid host values
+      let aimMode = "Magnetic";
+      if (state.aimAssist.mode === "Sticky") aimMode = "Magnetic";
+      if (state.aimAssist.mode === "Dynamic") aimMode = "Elastic";
+      if (state.aimAssist.mode === "Magnetic") aimMode = "Magnetic";
+
+      const payload = {
+        type: "UPDATE_ENHANCEMENTS",
+        payload: {
+          slot: state.slot,
+          smartTriggerFlip: state.smartTriggerFlip,
+          aim: {
+            enabled: state.aimAssist.enabled,
+            strength: state.aimAssist.strength,
+            radius: state.aimAssist.radius,
+            stickiness: state.aimAssist.stickiness,
+            mode: aimMode,
+            prediction: state.aimAssist.prediction
+          },
+          recoil: {
+            enabled: state.recoil.enabled,
+            vertical: state.recoil.vertical / 100.0, // Convert 0-100 to 0-1
+            horizontal: state.recoil.horizontal / 100.0, // Convert 0-100 to 0-1
+            strength: state.recoil.strength,
+            adaptationRate: state.recoil.adaptationRate,
+            preset: state.recoil.weaponPreset,
+            prediction: state.recoil.prediction,
+            patternLearning: state.recoil.patternLearning
+          },
+          rapidFire: {
+            enabled: state.rapidFire.enabled,
+            fireRateMultiplier: state.rapidFire.fireRateMultiplier,
+            humanizationLevel: state.rapidFire.humanizationLevel,
+            heatSimulation: state.rapidFire.heatSimulation,
+            burstMode: state.rapidFire.burstMode,
+            adaptiveTiming: state.rapidFire.adaptiveTiming
+          },
+          humanization: {
+            enabled: state.humanization.enabled,
+            varianceLevel: state.humanization.varianceLevel,
+            errorRate: state.humanization.errorRate,
+            reactionTimeVariation: state.humanization.reactionTime,
+            inputNoiseLevel: state.humanization.inputNoise,
+            fatigueSimulation: state.humanization.fatigueSimulation
+          }
+        }
+      };
+
+      postToHost(payload);
+    }, 100);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [state]);
+
+  const handleResetOverride = (slot: number) => {
+    postToHost({
+      type: "CLEAR_ENHANCEMENTS_OVERRIDE",
+      payload: { slot }
+    });
+  };
+
   return (
     <Shell>
       {/* Header */}
-      <div className="flex justify-between items-end mb-8">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="p-2 rounded-lg bg-pink-500/10 text-pink-400 border border-pink-500/20">
-              <Zap className="w-6 h-6" />
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex justify-between items-end">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="p-2 rounded-lg bg-pink-500/10 text-pink-400 border border-pink-500/20">
+                <Zap className="w-6 h-6" />
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight text-white">Enhancements</h1>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">Enhancements</h1>
+            <p className="text-muted-foreground text-sm pl-1">Tune aim assist, recoil shaping, rapid fire and movement layers. All systems integrated.</p>
           </div>
-          <p className="text-muted-foreground text-sm pl-1">Tune aim assist, recoil shaping, rapid fire and movement layers. All systems integrated.</p>
+          <div className="flex items-center gap-4 bg-black/40 border border-white/10 rounded-full py-1.5 px-4 backdrop-blur-md">
+            <div className="flex items-center gap-2">
+               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+               <span className="text-xs font-mono font-bold text-white">SYSTEM ACTIVE</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-4 bg-black/40 border border-white/10 rounded-full py-1.5 px-4 backdrop-blur-md">
-          <div className="flex items-center gap-2">
-             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-             <span className="text-xs font-mono font-bold text-white">SYSTEM ACTIVE</span>
-          </div>
+
+        {/* Status & Global Controls Bar */}
+        <div className="flex items-center justify-between p-3 bg-card/20 border border-white/5 rounded-lg backdrop-blur-sm">
+           <div className="flex items-center gap-2">
+             <div className={`w-2 h-2 rounded-full ${hosted ? "bg-emerald-500" : "bg-yellow-500"}`}></div>
+             <span className="text-xs text-muted-foreground font-mono">
+               {hosted ? "Connected to DS4Windows" : "Not hosted (browser mode) — messages will log to console"}
+             </span>
+           </div>
+           
+           <div className="flex items-center gap-3">
+             <div className="flex items-center gap-2 px-3 border-r border-white/10">
+                <Gamepad2 className="w-4 h-4 text-muted-foreground" />
+                <select 
+                  className="bg-transparent text-xs text-white focus:outline-none"
+                  value={state.slot}
+                  onChange={(e) => setState({ ...state, slot: parseInt(e.target.value) })}
+                >
+                  <option value={0}>Slot 1</option>
+                  <option value={1}>Slot 2</option>
+                  <option value={2}>Slot 3</option>
+                  <option value={3}>Slot 4</option>
+                </select>
+             </div>
+             
+             <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground hover:text-white" onClick={() => handleResetOverride(state.slot)}>
+               Reset Override (Slot {state.slot + 1})
+             </Button>
+             <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground hover:text-white" onClick={() => handleResetOverride(-1)}>
+               Reset All
+             </Button>
+           </div>
         </div>
       </div>
 
@@ -199,7 +315,11 @@ export default function Enhancements() {
 
             <div>
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Mode</label>
-              <select className="w-full px-3 py-2.5 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary">
+              <select 
+                className="w-full px-3 py-2.5 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary"
+                value={state.aimAssist.mode}
+                onChange={(e) => setState({ ...state, aimAssist: { ...state.aimAssist, mode: e.target.value as any } })}
+              >
                 <option>Magnetic</option>
                 <option>Sticky</option>
                 <option>Dynamic</option>
@@ -219,6 +339,12 @@ export default function Enhancements() {
                 enabled={state.aimAssist.enabled}
                 onChange={(v) => setState({ ...state, aimAssist: { ...state.aimAssist, enabled: v } })}
                 activeStatus="System: Active"
+              />
+              <SettingToggle
+                label="Smart Trigger Flip"
+                description="Automatically invert triggers based on game context"
+                enabled={state.smartTriggerFlip}
+                onChange={(v) => setState({ ...state, smartTriggerFlip: v })}
               />
             </div>
           </div>
@@ -273,7 +399,11 @@ export default function Enhancements() {
 
             <div>
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Weapon Preset</label>
-              <select className="w-full px-3 py-2.5 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary">
+              <select 
+                className="w-full px-3 py-2.5 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary"
+                value={state.recoil.weaponPreset}
+                onChange={(e) => setState({ ...state, recoil: { ...state.recoil, weaponPreset: e.target.value } })}
+              >
                 <option>Custom</option>
                 <option>AR-Platform</option>
                 <option>SMG-Rapid</option>
