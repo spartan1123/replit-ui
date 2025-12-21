@@ -1,0 +1,48 @@
+You are analyzing a Replit web UI project that will control a native Windows C# app (DS4Windows) via IPC.
+
+Please answer the following questions clearly and explicitly. If something does not exist yet, say so.
+
+1) TRANSPORT METHOD
+How does this Replit app currently send messages outside the browser?
+Check for and report which of these are used (with file paths and code snippets):
+- window.chrome.webview.postMessage (WebView2)
+- WebSocket (new WebSocket("ws://..."))
+- fetch / HTTP calls to localhost
+- Other IPC or message bridge
+
+2) MESSAGE ENVELOPE / WRAPPER
+Provide ONE real example of a message this app sends outward (exact object or JSON).
+If none exist yet, propose the CURRENT standard pattern used in this app (e.g., { type, payload } or { action, data }).
+
+3) SLOT SELECTION
+How does the UI determine which controller slot (0–3 or 1–4) it is editing?
+- Dropdown?
+- Hardcoded?
+- Not implemented yet?
+If implemented, show the state variable and where it is set.
+
+4) UPDATE FREQUENCY
+When a slider or toggle is changed:
+- Does the app send updates continuously while dragging?
+- Only on mouse release?
+- Only when an Apply/Save button is pressed?
+Show the relevant event handlers (onChange / onInput / debounce).
+
+5) DATA SHAPE & TYPES
+For UI controls, specify:
+- Slider values: 0–1 floats, 0–100, or absolute numbers?
+- Toggles: true/false or 0/1?
+- Enums (e.g., AimMode): strings ("Magnetic") or numeric values?
+
+6) INITIAL STATE SYNC
+On app load, does the UI:
+- Request current settings from the native app?
+- Assume defaults?
+If it requests, show the request message and expected response shape.
+
+7) ONE REAL OR PROPOSED SAMPLE PAYLOAD
+Provide ONE complete example payload that this UI would send to update enhancements.
+If not implemented yet, propose a realistic example based on existing UI state.
+
+Answer concisely, with short explanations and code snippets where applicable.
+Do not invent systems that do not exist—state clearly if something is missing.
