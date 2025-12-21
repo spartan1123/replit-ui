@@ -37,6 +37,11 @@ interface TuningState {
     reactionTime: number;
     inputNoiseLevel: number;
   };
+  mapping: {
+    invertYLeftRight: boolean;
+    invertYGameOutput: boolean;
+    preferAnalogTriggers: boolean;
+  };
 }
 
 function StickVisualizer({ label, innerDeadzone, outerDeadzone }: { label: string; innerDeadzone: number; outerDeadzone: number }) {
@@ -134,6 +139,11 @@ export default function InputTuning() {
       reactionTime: 0.3,
       inputNoiseLevel: 0.0,
     },
+    mapping: {
+      invertYLeftRight: false,
+      invertYGameOutput: false,
+      preferAnalogTriggers: true,
+    }
   });
 
   return (
@@ -197,21 +207,30 @@ export default function InputTuning() {
                 <p className="text-xs font-medium text-white">Invert Y (L/R)</p>
                 <p className="text-[10px] text-muted-foreground">Flip Y-axis for L/R sticks</p>
               </div>
-              <ToggleSwitch enabled={false} onChange={() => {}} />
+              <ToggleSwitch 
+                enabled={tuning.mapping.invertYLeftRight} 
+                onChange={(v) => setTuning({ ...tuning, mapping: { ...tuning.mapping, invertYLeftRight: v } })} 
+              />
             </div>
             <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
               <div>
                 <p className="text-xs font-medium text-white">Invert Y (Game Output)</p>
                 <p className="text-[10px] text-muted-foreground">Flip Y-axis for camera output</p>
               </div>
-              <ToggleSwitch enabled={false} onChange={() => {}} />
+              <ToggleSwitch 
+                enabled={tuning.mapping.invertYGameOutput} 
+                onChange={(v) => setTuning({ ...tuning, mapping: { ...tuning.mapping, invertYGameOutput: v } })} 
+              />
             </div>
             <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
               <div>
                 <p className="text-xs font-medium text-white">Prefer Analog Triggers</p>
                 <p className="text-[10px] text-muted-foreground">Use analog for L2/R2 instead of binary</p>
               </div>
-              <ToggleSwitch enabled={true} onChange={() => {}} />
+              <ToggleSwitch 
+                enabled={tuning.mapping.preferAnalogTriggers} 
+                onChange={(v) => setTuning({ ...tuning, mapping: { ...tuning.mapping, preferAnalogTriggers: v } })} 
+              />
             </div>
           </div>
         </Card>

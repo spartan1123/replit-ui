@@ -14,6 +14,10 @@ export const isHosted = (): boolean => {
 };
 
 export const postToHost = (message: any): void => {
+  if (message.type === "UPDATE_ENHANCEMENTS") {
+    console.debug(`POST UPDATE_ENHANCEMENTS slot=${message.payload.slot}`, message.payload);
+  }
+
   if (isHosted()) {
     window.chrome!.webview!.postMessage(message);
   } else {
