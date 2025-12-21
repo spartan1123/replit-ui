@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Sliders, Zap, Users, Flame, Cpu } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Sliders, Zap, Users, Flame, Cpu, Eye } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -176,16 +176,52 @@ export default function InputTuning() {
     return DEFAULT_TUNING;
   });
 
-  // Save to localStorage on change
+  const [livePreview, setLivePreview] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const isFirstRender = useRef(true);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle changes (persistence + live preview)
   useEffect(() => {
+    // Skip initial effect
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Mark as dirty on any change
+    setIsDirty(true);
+
+    // Persist to localStorage
     localStorage.setItem("ceilpro.input.tuning", JSON.stringify(tuning));
-  }, [tuning]);
+
+    // Handle Live Preview
+    if (livePreview) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      timeoutRef.current = setTimeout(() => {
+        postToHost({
+          type: "APPLY_INPUT_TUNING",
+          payload: tuning
+        });
+      }, 100);
+    }
+    
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [tuning, livePreview]);
 
   const handleApply = () => {
     postToHost({
       type: "APPLY_INPUT_TUNING",
       payload: tuning
     });
+    setIsDirty(false);
     toast.success("Input tuning configuration applied");
   };
 
@@ -204,6 +240,17 @@ export default function InputTuning() {
         </div>
 
         <div className="flex items-center gap-3">
+           <div className="flex items-center gap-2 mr-2 px-3 py-1.5 bg-black/40 rounded-full border border-white/10">
+            <Eye className={`w-3 h-3 ${livePreview ? "text-emerald-400" : "text-muted-foreground"}`} />
+            <label className="text-xs font-medium text-white cursor-pointer select-none flex items-center gap-2">
+              Live Preview
+              <ToggleSwitch 
+                enabled={livePreview} 
+                onChange={setLivePreview} 
+              />
+            </label>
+          </div>
+
           <input
             type="text"
             placeholder="Profile name"
@@ -240,13 +287,20 @@ export default function InputTuning() {
         <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold text-white text-sm uppercase tracking-wide">Runtime Mapping</h3>
-            <Button 
-              className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold text-xs" 
-              size="sm"
-              onClick={handleApply}
-            >
-              Apply
-            </Button>
+            <div className="flex items-center gap-3">
+              {isDirty && (
+                <span className="text-xs text-yellow-400 animate-pulse font-medium">
+                  ● Unapplied changes
+                </span>
+              )}
+              <Button 
+                className={`text-black font-semibold text-xs ${isDirty ? "bg-emerald-500 hover:bg-emerald-600" : "bg-emerald-500/50 hover:bg-emerald-500/60"}`}
+                size="sm"
+                onClick={handleApply}
+              >
+                Apply
+              </Button>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
