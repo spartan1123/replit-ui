@@ -4,6 +4,7 @@ import { Shell } from "@/components/layout/shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface TuningState {
   leftStick: {
@@ -44,12 +45,13 @@ interface TuningState {
   };
 }
 
-function StickVisualizer({ label, innerDeadzone, outerDeadzone }: { label: string; innerDeadzone: number; outerDeadzone: number }) {
+function StickVisualizer({ label, innerDeadzone, outerDeadzone, inverted = false }: { label: string; innerDeadzone: number; outerDeadzone: number; inverted?: boolean }) {
   return (
     <div className="flex flex-col items-center">
       <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
         <Sliders className="w-4 h-4" />
         {label}
+        {inverted && <Badge variant="destructive" className="text-[10px] h-4 px-1">INV</Badge>}
       </h4>
       <div className="relative w-28 h-28 rounded-full border border-emerald-500/30 bg-black/40 flex items-center justify-center">
         {/* Outer circle */}
@@ -61,14 +63,24 @@ function StickVisualizer({ label, innerDeadzone, outerDeadzone }: { label: strin
         ></div>
         {/* Center dot */}
         <div className="absolute w-2 h-2 rounded-full bg-emerald-400"></div>
+        
+        {/* Axis indicators */}
+        <div className="absolute w-full h-[1px] bg-emerald-500/10"></div>
+        <div className="absolute h-full w-[1px] bg-emerald-500/10"></div>
+        
+        {inverted && (
+          <div className="absolute right-0 top-0 text-[8px] text-red-400 font-mono opacity-50 p-1">
+            -Y
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function SliderControl({ label, value, onChange, min = 0, max = 100, displayValue }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; displayValue?: string }) {
+function SliderControl({ label, value, onChange, min = 0, max = 100, displayValue, disabled = false }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; displayValue?: string; disabled?: boolean }) {
   return (
-    <div className="space-y-1">
+    <div className={`space-y-1 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
       <div className="flex justify-between items-center">
         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</label>
         <span className="text-xs font-mono text-emerald-400">{displayValue !== undefined ? displayValue : value.toFixed(1)}</span>
@@ -80,7 +92,8 @@ function SliderControl({ label, value, onChange, min = 0, max = 100, displayValu
         step={0.1}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full h-1.5 bg-gray-800 rounded-full appearance-none cursor-pointer accent-emerald-500"
+        disabled={disabled}
+        className="w-full h-1.5 bg-gray-800 rounded-full appearance-none cursor-pointer accent-emerald-500 disabled:accent-gray-600"
       />
     </div>
   );
@@ -89,8 +102,12 @@ function SliderControl({ label, value, onChange, min = 0, max = 100, displayValu
 function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
-      onClick={() => onChange(!enabled)}
-      className={`relative w-10 h-6 rounded-full transition-colors ${
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        onChange(!enabled);
+      }}
+      className={`cursor-pointer relative w-10 h-6 rounded-full transition-colors ${
         enabled ? "bg-emerald-500" : "bg-gray-700"
       }`}
     >
@@ -219,7 +236,10 @@ export default function InputTuning() {
               </div>
               <ToggleSwitch 
                 enabled={tuning.mapping.invertYGameOutput} 
-                onChange={(v) => setTuning({ ...tuning, mapping: { ...tuning.mapping, invertYGameOutput: v } })} 
+                onChange={(v) => {
+                  setTuning({ ...tuning, mapping: { ...tuning.mapping, invertYGameOutput: v } });
+                  toast.success(`Game Output Y-Axis ${v ? "Inverted" : "Normal"}`);
+                }} 
               />
             </div>
             <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
@@ -243,6 +263,7 @@ export default function InputTuning() {
               label="Left Stick"
               innerDeadzone={tuning.leftStick.innerDeadzone}
               outerDeadzone={tuning.leftStick.outerDeadzone}
+              inverted={tuning.mapping.invertYLeftRight}
             />
             <div className="mt-6 space-y-4">
               <SliderControl
@@ -285,6 +306,7 @@ export default function InputTuning() {
               label="Right Stick"
               innerDeadzone={tuning.rightStick.innerDeadzone}
               outerDeadzone={tuning.rightStick.outerDeadzone}
+              inverted={tuning.mapping.invertYLeftRight}
             />
             <div className="mt-6 space-y-4">
               <SliderControl
@@ -326,8 +348,15 @@ export default function InputTuning() {
             <h4 className="text-sm font-semibold text-emerald-400 mb-4 flex items-center gap-2">
               <Zap className="w-4 h-4" />
               Triggers
+              {!tuning.mapping.preferAnalogTriggers && <Badge variant="secondary" className="text-[10px] h-4 px-1 ml-auto">BINARY</Badge>}
             </h4>
             <div className="space-y-4">
+              {!tuning.mapping.preferAnalogTriggers && (
+                <div className="p-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-yellow-200/80 text-[10px] mb-2 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                  Binary Mode: Triggers act as on/off buttons.
+                </div>
+              )}
               <SliderControl
                 label="L2 Deadzone"
                 value={tuning.triggers.d12}
@@ -335,6 +364,7 @@ export default function InputTuning() {
                 min={0}
                 max={100}
                 displayValue={(tuning.triggers.d12 * 100).toFixed(0) + "%"}
+                disabled={!tuning.mapping.preferAnalogTriggers}
               />
               <SliderControl
                 label="R2 Deadzone"
@@ -343,6 +373,7 @@ export default function InputTuning() {
                 min={0}
                 max={100}
                 displayValue={(tuning.triggers.s1n5 * 100).toFixed(0) + "%"}
+                disabled={!tuning.mapping.preferAnalogTriggers}
               />
               <SliderControl
                 label="Trigger Sensitivity"
@@ -351,6 +382,7 @@ export default function InputTuning() {
                 min={0}
                 max={100}
                 displayValue={(tuning.triggers.s3n3 * 100).toFixed(0) + "%"}
+                disabled={!tuning.mapping.preferAnalogTriggers}
               />
             </div>
           </Card>
