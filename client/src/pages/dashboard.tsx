@@ -161,7 +161,7 @@ function SystemStatus() {
   );
 }
 
-import controllerImage from '@assets/mylogo_1766393971658.png'
+import controllerImage from '/assets/controller.png'
 
 function ControllerVisualizer() {
   return (
@@ -199,6 +199,10 @@ function ControllerVisualizer() {
              src={controllerImage} 
              alt="Controller Visualization"
              className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(16,185,129,0.2)]"
+             loading="eager"
+             fetchPriority="high"
+             decoding="async"
+             style={{ aspectRatio: "16/9" }}
            />
         </div>
 
