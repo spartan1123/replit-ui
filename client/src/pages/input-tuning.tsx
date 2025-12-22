@@ -178,8 +178,57 @@ export default function InputTuning() {
 
   const [livePreview, setLivePreview] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [applyPending, setApplyPending] = useState(false);
+  const [applyStatus, setApplyStatus] = useState<"success" | "error" | "applying" | null>(null);
+  
   const isFirstRender = useRef(true);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const applyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle Host Messages (ACK/NACK)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+
+      if (data.type === "AXIS_CONFIG_ACK") {
+        const { ok, persisted, message, error } = data;
+
+        // Clear the safety timeout since we got a response
+        if (applyTimeoutRef.current && persisted) {
+          clearTimeout(applyTimeoutRef.current);
+          applyTimeoutRef.current = null;
+        }
+
+        if (ok) {
+          if (persisted) {
+            // Full Apply Success
+            setIsDirty(false);
+            setApplyPending(false);
+            setApplyStatus("success");
+            toast.success(message || "Input tuning configuration applied");
+            
+            // Clear success status after 1.5s
+            setTimeout(() => setApplyStatus(null), 1500);
+          } else {
+            // Preview ACK (do nothing / debug log)
+            // console.debug("Preview ACK received");
+          }
+        } else {
+          // Error / NACK
+          setApplyPending(false);
+          setApplyStatus("error");
+          toast.error(error || message || "Failed to apply configuration");
+          
+          // Clear error status after 2s
+          setTimeout(() => setApplyStatus(null), 2000);
+        }
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   // Handle changes (persistence + live preview)
   useEffect(() => {
@@ -217,12 +266,23 @@ export default function InputTuning() {
   }, [tuning, livePreview]);
 
   const handleApply = () => {
+    setApplyPending(true);
+    setApplyStatus("applying");
+    
     postToHost({
       type: "APPLY_AXIS_CONFIG",
       payload: tuning
     });
-    setIsDirty(false);
-    toast.success("Input tuning configuration applied");
+
+    // Safety fallback: if no ACK within 2.5s
+    if (applyTimeoutRef.current) clearTimeout(applyTimeoutRef.current);
+    applyTimeoutRef.current = setTimeout(() => {
+      setApplyPending(false);
+      setApplyStatus(null); // Or keep it pending? User said "clear applyPending"
+      if (isDirty) { // Only show error if we haven't already succeeded (though we clear dirty on success)
+         toast.error("No response from host");
+      }
+    }, 2500);
   };
 
   return (
@@ -288,17 +348,37 @@ export default function InputTuning() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold text-white text-sm uppercase tracking-wide">Runtime Mapping</h3>
             <div className="flex items-center gap-3">
-              {isDirty && (
+              {applyStatus === "success" && (
+                <span className="text-xs text-emerald-400 font-bold animate-in fade-in slide-in-from-right-2 duration-300">
+                  Applied ✓
+                </span>
+              )}
+              {applyStatus === "error" && (
+                <span className="text-xs text-red-400 font-bold animate-in fade-in slide-in-from-right-2 duration-300">
+                  Error
+                </span>
+              )}
+              {applyStatus === "applying" && (
+                <span className="text-xs text-muted-foreground animate-pulse">
+                  Applying...
+                </span>
+              )}
+              {isDirty && !applyStatus && (
                 <span className="text-xs text-yellow-400 animate-pulse font-medium">
                   ● Unapplied changes
                 </span>
               )}
               <Button 
-                className={`text-black font-semibold text-xs ${isDirty ? "bg-emerald-500 hover:bg-emerald-600" : "bg-emerald-500/50 hover:bg-emerald-500/60"}`}
+                className={`text-black font-semibold text-xs ${
+                  isDirty 
+                    ? "bg-emerald-500 hover:bg-emerald-600" 
+                    : "bg-emerald-500/50 hover:bg-emerald-500/60"
+                }`}
                 size="sm"
                 onClick={handleApply}
+                disabled={applyPending}
               >
-                Apply
+                {applyPending ? "..." : "Apply"}
               </Button>
             </div>
           </div>
