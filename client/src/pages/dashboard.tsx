@@ -161,7 +161,7 @@ function SystemStatus() {
   );
 }
 
-import controllerImage from '@assets/real_love_1766176059550.png'
+import controllerImage from '@assets/mylogo_1766393971658.png'
 
 function ControllerVisualizer() {
   return (
