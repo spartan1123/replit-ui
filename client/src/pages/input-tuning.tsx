@@ -193,39 +193,50 @@ export default function InputTuning() {
   const [applyPending, setApplyPending] = useState(false);
   const [applyStatus, setApplyStatus] = useState<"success" | "error" | "applying" | null>(null);
   const [lastHostStatus, setLastHostStatus] = useState<{ text: string; time: number } | null>(null);
+  const [applyRequestId, setApplyRequestId] = useState<string | null>(null);
   
   const isFirstRender = useRef(true);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const applyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const applyRequestIdRef = useRef<string | null>(null);
+
+  // Helper to generate IDs
+  const generateRequestId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  };
 
   // Handle Host Messages (ACK/NACK)
   useEffect(() => {
     const handleMessage = (event: any) => {
-      // Defensive parsing: event can be object or string, source varies (WebView2 vs window)
-      // Prefer e?.data ?? e?.detail?.data ?? e
-      let rawData = event?.data ?? event?.detail?.data ?? event;
+      // Defensive parsing rules:
+      // 1. raw = e?.data ?? e?.detail?.data ?? e
+      // 2. If raw is string, try JSON.parse
+      // 3. Accept both { type: ... } and { data: { type: ... } }
       
+      let rawData = event?.data ?? event?.detail?.data ?? event;
       let data: any = rawData;
+      
       if (typeof rawData === "string") {
         try {
           data = JSON.parse(rawData);
         } catch (e) {
-          // If it's a string but not JSON, we might ignore it or check if it's a simple string command
-          // For this specific requirement, we just want to parse it if possible
+          // Not JSON, ignore
         }
+      }
+
+      // Check for wrapped data shape { data: { type: ... } }
+      if (data && data.data && typeof data.data === "object" && data.data.type) {
+        data = data.data;
       }
 
       if (!data || typeof data !== "object") return;
       if (data.type !== "AXIS_CONFIG_ACK") return;
 
-      const { ok, persisted, message, error, slot } = data;
+      const { ok, persisted, message, error, slot, requestId } = data;
       const timestamp = Date.now();
-
-      // Clear the safety timeout since we got a response
-      if (applyTimeoutRef.current && persisted) {
-        clearTimeout(applyTimeoutRef.current);
-        applyTimeoutRef.current = null;
-      }
 
       // Update Debug Status Line
       let statusText = "";
@@ -238,35 +249,57 @@ export default function InputTuning() {
 
       if (ok) {
         if (persisted) {
-          // Full Apply Success
+          // Check if this ACK matches our latest Apply request
+          // Only clear state if it matches (or if we weren't tracking an ID, for backward compat)
+          if (requestId && applyRequestIdRef.current && requestId !== applyRequestIdRef.current) {
+            console.debug("Ignoring stale ACK", { expected: applyRequestIdRef.current, got: requestId });
+            return;
+          }
+
+          // Full Apply Success - Clear safety timeout
+          if (applyTimeoutRef.current) {
+            clearTimeout(applyTimeoutRef.current);
+            applyTimeoutRef.current = null;
+          }
+
           setIsDirty(false);
           setApplyPending(false);
           setApplyStatus("success");
           
           // Show small "Applied ✓" for 1.5s
           setTimeout(() => setApplyStatus(null), 1500);
+          
+          // Allow one toast for success
+          toast.success("Configuration applied successfully");
         } else {
-          // Preview ACK - do NOT clear dirty
-          // Optionally debug log
+          // Preview ACK - do NOT clear isDirty, do NOT toast
+          // Just updated the status line above
         }
       } else {
         // Error / NACK
+        // For errors, we stop the pending state
+        if (applyTimeoutRef.current) {
+          clearTimeout(applyTimeoutRef.current);
+          applyTimeoutRef.current = null;
+        }
+
         setApplyPending(false);
         setApplyStatus("error");
-        toast.error(error || message || "Failed to apply configuration");
-        
-        // Clear error status after 2s
+        // Show error indicator for 2s
         setTimeout(() => setApplyStatus(null), 2000);
+        
+        // Show one toast for error
+        toast.error(error || message || "Failed to apply configuration");
       }
     };
 
-    // Prioritize WebView2 channel if available
+    // 1) WebView2-first listener
     const webview = (window as any).chrome?.webview;
     if (webview && typeof webview.addEventListener === "function") {
       webview.addEventListener("message", handleMessage);
     }
     
-    // Fallback for browser/dev
+    // 2) Fallback for browser/dev (ALSO attach)
     window.addEventListener("message", handleMessage);
 
     return () => {
@@ -298,9 +331,11 @@ export default function InputTuning() {
       }
       
       timeoutRef.current = setTimeout(() => {
+        const requestId = generateRequestId();
         postToHost({
           type: "PREVIEW_AXIS_CONFIG",
-          payload: tuning
+          payload: tuning,
+          requestId
         });
       }, 100);
     }
@@ -316,22 +351,27 @@ export default function InputTuning() {
     setApplyPending(true);
     setApplyStatus("applying");
     
+    const requestId = generateRequestId();
+    setApplyRequestId(requestId);
+    applyRequestIdRef.current = requestId;
+
     postToHost({
       type: "APPLY_AXIS_CONFIG",
-      payload: tuning
+      payload: tuning,
+      requestId
     });
 
-    // Safety fallback: if no ACK within 2.5s
+    // Safety fallback: if no ACK within 5s (increased from 2.5s)
     if (applyTimeoutRef.current) clearTimeout(applyTimeoutRef.current);
     applyTimeoutRef.current = setTimeout(() => {
       setApplyPending(false);
       // If we timed out, assume failure or at least stop the spinner
       if (isDirty) { 
          setApplyStatus("error");
-         toast.error("No response from host");
+         toast.error("No response from host (timeout)");
          setTimeout(() => setApplyStatus(null), 2000);
       }
-    }, 2500);
+    }, 5000);
   };
 
   return (
@@ -399,12 +439,12 @@ export default function InputTuning() {
               <h3 className="font-semibold text-white text-sm uppercase tracking-wide">Runtime Mapping</h3>
               {lastHostStatus && (
                 <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-2">
-                  <span>Last Host Status:</span>
+                  <span>Last Host:</span>
                   <span className={lastHostStatus.text.startsWith("ERROR") ? "text-red-400" : "text-emerald-400"}>
                     {lastHostStatus.text}
                   </span>
                   <span className="opacity-50">
-                    (<TimeAgo timestamp={lastHostStatus.time} />)
+                    <TimeAgo timestamp={lastHostStatus.time} />
                   </span>
                 </div>
               )}
