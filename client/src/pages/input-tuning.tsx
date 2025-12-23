@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Sliders, Zap, Users, Flame, Cpu, Eye } from "lucide-react";
+import { Sliders, Zap, Users, Flame, Cpu, Eye, Network, Activity, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,12 @@ interface TuningState {
     invertYGameOutput: boolean;
     preferAnalogTriggers: boolean;
   };
+}
+
+interface HostMessageLog {
+  ts: number;
+  type: string;
+  summary: string;
 }
 
 function StickVisualizer({ label, innerDeadzone, outerDeadzone, inverted = false }: { label: string; innerDeadzone: number; outerDeadzone: number; inverted?: boolean }) {
@@ -195,10 +201,17 @@ export default function InputTuning() {
   const [lastHostStatus, setLastHostStatus] = useState<{ text: string; time: number } | null>(null);
   const [applyRequestId, setApplyRequestId] = useState<string | null>(null);
   
+  // Host Link State
+  const [hostConnected, setHostConnected] = useState(false);
+  const [lastPongTs, setLastPongTs] = useState<number | null>(null);
+  const [messageLog, setMessageLog] = useState<HostMessageLog[]>([]);
+  const [isHostLinkOpen, setIsHostLinkOpen] = useState(false);
+
   const isFirstRender = useRef(true);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const applyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const applyRequestIdRef = useRef<string | null>(null);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper to generate IDs
   const generateRequestId = () => {
@@ -208,7 +221,33 @@ export default function InputTuning() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   };
 
-  // Handle Host Messages (ACK/NACK)
+  // Heartbeat Logic
+  useEffect(() => {
+    const startHeartbeat = () => {
+      heartbeatIntervalRef.current = setInterval(() => {
+        postToHost({
+          type: "CEILPRO_PING",
+          ts: Date.now()
+        });
+        
+        // Check for timeout
+        setLastPongTs((prev) => {
+          if (prev && Date.now() - prev > 4000) {
+            setHostConnected(false);
+          }
+          return prev;
+        });
+      }, 1500);
+    };
+
+    startHeartbeat();
+
+    return () => {
+      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+    };
+  }, []);
+
+  // Handle Host Messages (ACK/NACK + Pong)
   useEffect(() => {
     const handleMessage = (event: any) => {
       // Defensive parsing rules:
@@ -233,6 +272,23 @@ export default function InputTuning() {
       }
 
       if (!data || typeof data !== "object") return;
+
+      // Update message log
+      const logEntry: HostMessageLog = {
+        ts: Date.now(),
+        type: data.type || "UNKNOWN",
+        summary: JSON.stringify(data).slice(0, 100)
+      };
+      
+      setMessageLog(prev => [logEntry, ...prev].slice(0, 20));
+
+      // Handle Pong
+      if (data.type === "CEILPRO_PONG") {
+        setLastPongTs(Date.now());
+        setHostConnected(true);
+        return;
+      }
+
       if (data.type !== "AXIS_CONFIG_ACK") return;
 
       const { ok, persisted, message, error, slot, requestId } = data;
@@ -241,7 +297,7 @@ export default function InputTuning() {
       // Update Debug Status Line
       let statusText = "";
       if (ok) {
-        statusText = `OK ${persisted ? "persisted" : "preview"}${slot !== undefined ? ` slot ${slot}` : ""}`;
+        statusText = `OK ${persisted ? "persisted" : "preview"}${slot !== undefined ? ` slot ${slot}` : ""}${requestId ? ` req ${requestId.slice(0,4)}` : ""}`;
       } else {
         statusText = `ERROR: ${error || message || "Unknown error"}`;
       }
@@ -361,17 +417,17 @@ export default function InputTuning() {
       requestId
     });
 
-    // Safety fallback: if no ACK within 5s (increased from 2.5s)
+    // Safety fallback: if no ACK within 6s (increased from 5s)
     if (applyTimeoutRef.current) clearTimeout(applyTimeoutRef.current);
     applyTimeoutRef.current = setTimeout(() => {
       setApplyPending(false);
       // If we timed out, assume failure or at least stop the spinner
       if (isDirty) { 
          setApplyStatus("error");
-         toast.error("No response from host (timeout)");
+         toast.error("No response from host (no AXIS_CONFIG_ACK). Check Host Link panel.");
          setTimeout(() => setApplyStatus(null), 2000);
       }
-    }, 5000);
+    }, 6000);
   };
 
   return (
@@ -413,6 +469,105 @@ export default function InputTuning() {
 
       {/* Main Content */}
       <div className="space-y-6">
+        {/* Host Link Panel */}
+        <Card className="bg-card/40 border-border/50 overflow-hidden backdrop-blur-md">
+          <div 
+            className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/5 transition-colors"
+            onClick={() => setIsHostLinkOpen(!isHostLinkOpen)}
+          >
+            <div className="flex items-center gap-2">
+              <Network className={`w-4 h-4 ${hostConnected ? "text-emerald-400" : "text-red-400"}`} />
+              <span className="text-sm font-semibold text-white">Host Link</span>
+              <Badge variant={hostConnected ? "default" : "destructive"} className="text-[10px] h-4 px-1.5 uppercase">
+                {hostConnected ? "Connected" : "Disconnected"}
+              </Badge>
+            </div>
+            {isHostLinkOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+          </div>
+          
+          {isHostLinkOpen && (
+            <div className="p-4 pt-0 border-t border-white/5 bg-black/20">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                <div className="space-y-2">
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-muted-foreground">Status:</span>
+                     <span className={hostConnected ? "text-emerald-400 font-mono" : "text-red-400 font-mono"}>
+                       {hostConnected ? "ONLINE" : "OFFLINE"}
+                     </span>
+                   </div>
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-muted-foreground">Last Pong:</span>
+                     <span className="font-mono text-white">
+                        {lastPongTs ? <TimeAgo timestamp={lastPongTs} /> : "Never"}
+                     </span>
+                   </div>
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-muted-foreground">Last ACK:</span>
+                     <span className="font-mono text-white truncate max-w-[150px]" title={lastHostStatus?.text}>
+                        {lastHostStatus?.text || "None"}
+                     </span>
+                   </div>
+                </div>
+                <div className="flex flex-col gap-2 justify-center">
+                   <Button 
+                     size="sm" 
+                     variant="outline" 
+                     className="w-full text-xs h-7 gap-2"
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       postToHost({ type: "CEILPRO_PING", ts: Date.now() });
+                       toast.info("Ping sent");
+                     }}
+                   >
+                     <Activity className="w-3 h-3" />
+                     Ping Host
+                   </Button>
+                   <Button 
+                     size="sm" 
+                     variant="outline" 
+                     className="w-full text-xs h-7 gap-2"
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       const diagnostics = {
+                         tuning,
+                         applyRequestId,
+                         hostConnected,
+                         lastPongTs,
+                         lastHostStatus,
+                         messageLog
+                       };
+                       navigator.clipboard.writeText(JSON.stringify(diagnostics, null, 2));
+                       toast.success("Diagnostics copied to clipboard");
+                     }}
+                   >
+                     <Copy className="w-3 h-3" />
+                     Copy Diagnostics
+                   </Button>
+                </div>
+              </div>
+              
+              <div className="mt-2">
+                <h4 className="text-[10px] font-semibold text-muted-foreground uppercase mb-2">Message Trace (Last 20)</h4>
+                <div className="h-32 overflow-y-auto bg-black/40 rounded border border-white/5 p-2 font-mono text-[10px] space-y-1">
+                  {messageLog.length === 0 ? (
+                    <div className="text-muted-foreground italic text-center py-4">No messages received</div>
+                  ) : (
+                    messageLog.map((msg, idx) => (
+                      <div key={idx} className="flex gap-2 border-b border-white/5 last:border-0 pb-1 last:pb-0">
+                        <span className="text-emerald-500/70 whitespace-nowrap">
+                          {new Date(msg.ts).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' })}.{new Date(msg.ts).getMilliseconds().toString().padStart(3, '0')}
+                        </span>
+                        <span className="text-blue-400 font-bold whitespace-nowrap">{msg.type}</span>
+                        <span className="text-gray-400 truncate">{msg.summary}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
         {/* Profile Management */}
         <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
           <h3 className="font-semibold text-white mb-4 text-sm uppercase tracking-wide">Profile Management</h3>

@@ -1,0 +1,111 @@
+CEILPRO-Replit-AXIS-ACK-005 — Make Apply reliable + self-diagnosing (no DevTools)
+
+Goal: Fix “Applying → Error” and eliminate guessing by adding an in-UI host link monitor + a compact message trace.
+
+Implement in: client/src/pages/input-tuning.tsx
+
+1) Add a “Host Link” mini panel (inside Input Tuning page)
+
+Add a small, non-intrusive card (can be collapsed) called “Host Link” that shows:
+
+Connected: Yes/No
+
+Last PONG: time ago (e.g., “0.8s ago”)
+
+Last ACK: summary line (e.g., “ok persisted slot 0 req abc123”)
+
+Last Error: last error text (if any)
+
+Buttons:
+
+Ping Host
+
+Copy Diagnostics (copies JSON including latest tuning state, lastApplyRequestId, last 20 host messages)
+
+2) Implement Ping/Pong heartbeat (no manual console)
+
+On mount, start a heartbeat: every 1500ms, send { type: "CEILPRO_PING", ts: Date.now() } to host
+
+If a CEILPRO_PONG arrives, set connected=true and update lastPongTs
+
+If no pong for >4000ms, set connected=false
+
+Show Connected: No in the UI when disconnected and disable Apply (or warn).
+
+3) Normalize host message receiving (WebView2-first)
+
+Use one shared handler that works in WebView2 and normal browser:
+
+Prefer window.chrome?.webview?.addEventListener("message", handler)
+
+Fallback to window.addEventListener("message", handler)
+
+Defensive parse:
+
+Accept object payloads and JSON strings
+
+Accept wrappers like { data: {...} } or { detail: { data: ... } }
+
+4) Apply must only clear “Unapplied changes” on the right ACK
+
+When clicking Apply:
+
+create a requestId (uuid or timestamp+random)
+
+send APPLY_AXIS_CONFIG with full state + requestId
+
+set applyPending=true, store pendingApplyRequestId=requestId
+
+show status “Applying…” next to Apply
+
+When receiving AXIS_CONFIG_ACK:
+
+If ok=true AND persisted=true AND requestId === pendingApplyRequestId:
+
+isDirty=false
+
+applyPending=false
+
+show “Applied ✓” for 1.5s
+
+If ok=true and persisted=false:
+
+treat as preview ack: do not clear dirty, do not toast
+
+If ok=false:
+
+applyPending=false
+
+show “Error” indicator for 2s
+
+keep isDirty=true
+
+5) Stop “Applying → Error” spam during Live Preview
+
+Do not run timeouts for preview messages.
+
+For Apply timeout:
+
+only start timeout when Apply clicked
+
+timeout 6s
+
+if timeout hits and still pending, show:
+
+“No response from host (no AXIS_CONFIG_ACK). Check Host Link panel.”
+
+keep isDirty=true
+
+6) Add a small message trace (last 20 host messages)
+
+In the Host Link panel show a scrolling list of last ~20 message summaries:
+
+type, ok/persisted, slot, requestId, ts age
+This is your “no-DevTools” view.
+
+7) Build verify
+
+Run:
+
+npx vite build --base ./
+Confirm CEILPRO_PING, CEILPRO_PONG, APPLY_AXIS_CONFIG, AXIS_CONFIG_ACK exist in output bundle.
