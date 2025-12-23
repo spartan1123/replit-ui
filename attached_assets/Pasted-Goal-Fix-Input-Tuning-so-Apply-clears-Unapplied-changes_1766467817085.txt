@@ -1,0 +1,64 @@
+Goal: Fix Input Tuning so Apply clears “● Unapplied changes” when the host confirms success. Remove all uncertainty by adding a small “Last Host Status” debug line (non-intrusive) so I don’t need DevTools.
+
+Problem: When Live Preview is ON, I can change values and persistence works, but clicking Apply does NOT clear “● Unapplied changes”. That means the UI is not receiving / not handling host ACK correctly.
+
+Requirements (must do all):
+
+In client/src/pages/input-tuning.tsx, implement host message listening using WebView2 channel first:
+
+If available: window.chrome?.webview?.addEventListener("message", handler)
+
+Fallback for browser/dev: window.addEventListener("message", handler)
+Use both safely, but prioritize WebView2.
+
+Message parsing must be defensive: the event can be object or string.
+
+Prefer const msg = e?.data ?? e?.detail?.data ?? e;
+
+If typeof msg === "string", try JSON.parse.
+
+Ignore anything where msg.type !== "AXIS_CONFIG_ACK".
+
+Support payload shape:
+
+type AxisAck = {
+  type: "AXIS_CONFIG_ACK";
+  ok: boolean;
+  slot?: number;
+  persisted?: boolean;
+  message?: string;
+  error?: string;
+}
+
+
+Correct behavior:
+
+On Apply click: set applyPending=true, keep isDirty=true until confirmed.
+
+On ACK with ok=true && persisted=true: set isDirty=false, set applyPending=false, show small “Applied ✓” for 1.5s. (Toast optional.)
+
+On ACK with ok=true && persisted=false (preview): do NOT clear dirty; do NOT toast.
+
+On ACK with ok=false: keep dirty, set applyPending=false, show small “Error” for 2s and toast error (or inline text).
+
+Add a non-intrusive UI debug line near the Apply button (so no DevTools needed):
+
+Label: “Last Host Status:”
+
+Show: OK persisted slot X or OK preview slot X or ERROR: <text>
+
+Also show timestamp “(just now / 2s ago)” or store Date.now and render seconds ago.
+
+This line should update only on AXIS_CONFIG_ACK messages.
+
+Add a 2.5s safety timeout: if Apply is pending and no persisted ACK arrives, set applyPending=false and show error “No response from host”. Keep dirty.
+
+Verify without DevTools:
+
+Click Apply → debug line must update.
+
+If debug line never updates, the listener is wrong. Fix it until it updates.
+
+Rebuild: npx vite build --base ./ and confirm the production bundle includes “AXIS_CONFIG_ACK” string.
+
+Output: implement the fix and explain where/what you changed (file + key functions).
