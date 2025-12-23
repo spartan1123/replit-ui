@@ -138,6 +138,18 @@ function SettingToggle({ label, description, enabled, onChange, activeStatus }: 
   );
 }
 
+function TimeAgo({ timestamp }: { timestamp: number }) {
+  const [ago, setAgo] = useState(0);
+  useEffect(() => {
+    setAgo(Math.floor((Date.now() - timestamp) / 1000));
+    const interval = setInterval(() => {
+      setAgo(Math.floor((Date.now() - timestamp) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timestamp]);
+  return <span>{ago < 1 ? "just now" : `${ago}s ago`}</span>;
+}
+
 export default function InputTuning() {
   const DEFAULT_TUNING: TuningState = {
     leftStick: { innerDeadzone: 0.15, outerDeadzone: 0.95, sensitivity: 1.0, responseCurve: "linear" },
@@ -180,6 +192,7 @@ export default function InputTuning() {
   const [isDirty, setIsDirty] = useState(false);
   const [applyPending, setApplyPending] = useState(false);
   const [applyStatus, setApplyStatus] = useState<"success" | "error" | "applying" | null>(null);
+  const [lastHostStatus, setLastHostStatus] = useState<{ text: string; time: number } | null>(null);
   
   const isFirstRender = useRef(true);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -187,47 +200,81 @@ export default function InputTuning() {
 
   // Handle Host Messages (ACK/NACK)
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const data = event.data;
+    const handleMessage = (event: any) => {
+      // Defensive parsing: event can be object or string, source varies (WebView2 vs window)
+      // Prefer e?.data ?? e?.detail?.data ?? e
+      let rawData = event?.data ?? event?.detail?.data ?? event;
+      
+      let data: any = rawData;
+      if (typeof rawData === "string") {
+        try {
+          data = JSON.parse(rawData);
+        } catch (e) {
+          // If it's a string but not JSON, we might ignore it or check if it's a simple string command
+          // For this specific requirement, we just want to parse it if possible
+        }
+      }
+
       if (!data || typeof data !== "object") return;
+      if (data.type !== "AXIS_CONFIG_ACK") return;
 
-      if (data.type === "AXIS_CONFIG_ACK") {
-        const { ok, persisted, message, error } = data;
+      const { ok, persisted, message, error, slot } = data;
+      const timestamp = Date.now();
 
-        // Clear the safety timeout since we got a response
-        if (applyTimeoutRef.current && persisted) {
-          clearTimeout(applyTimeoutRef.current);
-          applyTimeoutRef.current = null;
-        }
+      // Clear the safety timeout since we got a response
+      if (applyTimeoutRef.current && persisted) {
+        clearTimeout(applyTimeoutRef.current);
+        applyTimeoutRef.current = null;
+      }
 
-        if (ok) {
-          if (persisted) {
-            // Full Apply Success
-            setIsDirty(false);
-            setApplyPending(false);
-            setApplyStatus("success");
-            toast.success(message || "Input tuning configuration applied");
-            
-            // Clear success status after 1.5s
-            setTimeout(() => setApplyStatus(null), 1500);
-          } else {
-            // Preview ACK (do nothing / debug log)
-            // console.debug("Preview ACK received");
-          }
-        } else {
-          // Error / NACK
+      // Update Debug Status Line
+      let statusText = "";
+      if (ok) {
+        statusText = `OK ${persisted ? "persisted" : "preview"}${slot !== undefined ? ` slot ${slot}` : ""}`;
+      } else {
+        statusText = `ERROR: ${error || message || "Unknown error"}`;
+      }
+      setLastHostStatus({ text: statusText, time: timestamp });
+
+      if (ok) {
+        if (persisted) {
+          // Full Apply Success
+          setIsDirty(false);
           setApplyPending(false);
-          setApplyStatus("error");
-          toast.error(error || message || "Failed to apply configuration");
+          setApplyStatus("success");
           
-          // Clear error status after 2s
-          setTimeout(() => setApplyStatus(null), 2000);
+          // Show small "Applied ✓" for 1.5s
+          setTimeout(() => setApplyStatus(null), 1500);
+        } else {
+          // Preview ACK - do NOT clear dirty
+          // Optionally debug log
         }
+      } else {
+        // Error / NACK
+        setApplyPending(false);
+        setApplyStatus("error");
+        toast.error(error || message || "Failed to apply configuration");
+        
+        // Clear error status after 2s
+        setTimeout(() => setApplyStatus(null), 2000);
       }
     };
 
+    // Prioritize WebView2 channel if available
+    const webview = (window as any).chrome?.webview;
+    if (webview && typeof webview.addEventListener === "function") {
+      webview.addEventListener("message", handleMessage);
+    }
+    
+    // Fallback for browser/dev
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+
+    return () => {
+      if (webview && typeof webview.removeEventListener === "function") {
+        webview.removeEventListener("message", handleMessage);
+      }
+      window.removeEventListener("message", handleMessage);
+    };
   }, []);
 
   // Handle changes (persistence + live preview)
@@ -278,9 +325,11 @@ export default function InputTuning() {
     if (applyTimeoutRef.current) clearTimeout(applyTimeoutRef.current);
     applyTimeoutRef.current = setTimeout(() => {
       setApplyPending(false);
-      setApplyStatus(null); // Or keep it pending? User said "clear applyPending"
-      if (isDirty) { // Only show error if we haven't already succeeded (though we clear dirty on success)
+      // If we timed out, assume failure or at least stop the spinner
+      if (isDirty) { 
+         setApplyStatus("error");
          toast.error("No response from host");
+         setTimeout(() => setApplyStatus(null), 2000);
       }
     }, 2500);
   };
@@ -346,7 +395,20 @@ export default function InputTuning() {
         {/* Runtime Mapping */}
         <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-white text-sm uppercase tracking-wide">Runtime Mapping</h3>
+            <div className="flex flex-col gap-1">
+              <h3 className="font-semibold text-white text-sm uppercase tracking-wide">Runtime Mapping</h3>
+              {lastHostStatus && (
+                <div className="text-[10px] font-mono text-muted-foreground flex items-center gap-2">
+                  <span>Last Host Status:</span>
+                  <span className={lastHostStatus.text.startsWith("ERROR") ? "text-red-400" : "text-emerald-400"}>
+                    {lastHostStatus.text}
+                  </span>
+                  <span className="opacity-50">
+                    (<TimeAgo timestamp={lastHostStatus.time} />)
+                  </span>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               {applyStatus === "success" && (
                 <span className="text-xs text-emerald-400 font-bold animate-in fade-in slide-in-from-right-2 duration-300">
