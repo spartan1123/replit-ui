@@ -1,0 +1,49 @@
+CEILPRO-Replit-AXIS-ACK-004 — Make Apply clear “Unapplied changes” only on persisted AXIS_CONFIG_ACK, and stop false timeout errors
+
+Problem:
+With Live Preview ON, clicking Apply shows “Applying…” then “Error” then returns to “● Unapplied changes”.
+This happens because the UI never receives AXIS_CONFIG_ACK (or listens incorrectly), so a 2.5s timeout fires.
+
+Goal:
+Robustly receive host messages in WebView2 AND dev mode, parse defensively, and only show timeout errors when Apply truly has no ACK.
+
+Requirements:
+1) WebView2-first listener:
+   - If window.chrome?.webview?.addEventListener exists, attach:
+     window.chrome.webview.addEventListener("message", handler)
+   - ALSO attach window.addEventListener("message", handler) as fallback for dev/testing.
+2) Defensive parsing:
+   - raw = e?.data ?? e?.detail?.data ?? e
+   - If raw is string, try JSON.parse
+   - Accept both shapes:
+     A) { type:"AXIS_CONFIG_ACK", ok:true, persisted:true, slot:0, requestId:"..." }
+     B) { data:{ type:"AXIS_CONFIG_ACK", ... } }
+3) Add requestId:
+   - When sending PREVIEW_AXIS_CONFIG and APPLY_AXIS_CONFIG, include requestId: crypto.randomUUID() (or fallback random string).
+   - Store the latest applyRequestId in state.
+   - Only clear applyPending/isDirty when ACK matches the latest applyRequestId (if ACK has requestId).
+4) UI rules:
+   - If ok=true && persisted=true:
+       isDirty=false
+       applyPending=false
+       show “Applied ✓” for 1.5s
+       toast is allowed (one)
+   - If ok=true && persisted=false:
+       do NOT clear isDirty
+       do NOT toast (avoid spam)
+       update a small “Last host status” line
+   - If ok=false:
+       applyPending=false
+       keep isDirty=true
+       show “Error” indicator for 2s and one toast
+5) Fix the timeout behavior:
+   - Only start the “no response from host” timeout for APPLY (not for preview).
+   - Increase timeout to 5s.
+   - If Live Preview ON, do not show any “preview timeout” errors.
+6) Verification (non-manual):
+   - Add a small debug line on Input Tuning:
+     “Last Host: <status> <age>”
+   - Ensure that clicking Apply updates this line even if toasts are suppressed.
+7) Rebuild:
+   - npx vite build --base ./
+   - Confirm strings exist in dist bundle: AXIS_CONFIG_ACK, APPLY_AXIS_CONFIG, PREVIEW_AXIS_CONFIG
