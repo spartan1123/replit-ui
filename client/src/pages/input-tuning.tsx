@@ -1,11 +1,20 @@
 import { useState, useEffect, useRef } from "react";
-import { Sliders, Zap, Users, Flame, Cpu, Eye, Network, Activity, ChevronDown, ChevronRight, Copy } from "lucide-react";
+import { Sliders, Zap, Users, Flame, Cpu, Eye, Network, Activity, ChevronDown, ChevronRight, Copy, Lock } from "lucide-react";
 import { Shell } from "@/components/layout/shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { postToHost } from "@/lib/hostBridge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 interface TuningState {
   leftStick: {
@@ -206,6 +215,11 @@ export default function InputTuning() {
   const [lastPongTs, setLastPongTs] = useState<number | null>(null);
   const [messageLog, setMessageLog] = useState<HostMessageLog[]>([]);
   const [isHostLinkOpen, setIsHostLinkOpen] = useState(false);
+  
+  // Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [passcodeInput, setPasscodeInput] = useState("");
 
   const isFirstRender = useRef(true);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -433,8 +447,61 @@ export default function InputTuning() {
     }, 6000);
   };
 
+  const handleHostLinkClick = () => {
+    if (isAuthenticated) {
+      setIsHostLinkOpen(!isHostLinkOpen);
+    } else {
+      setPasscodeInput("");
+      setShowAuthDialog(true);
+    }
+  };
+
+  const handleUnlock = () => {
+    if (passcodeInput === "Kimmii19@") {
+      setIsAuthenticated(true);
+      setIsHostLinkOpen(true);
+      setShowAuthDialog(false);
+      toast.success("Host Link unlocked");
+    } else {
+      toast.error("Passcode error");
+      setPasscodeInput("");
+    }
+  };
+
   return (
     <Shell>
+      {/* Auth Dialog */}
+      <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
+        <DialogContent className="sm:max-w-md bg-zinc-900 border border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle>Host Link Security</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Enter passcode to access host diagnostics.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 py-4">
+            <div className="grid flex-1 gap-2">
+              <Input
+                type="password"
+                placeholder="Passcode"
+                value={passcodeInput}
+                onChange={(e) => setPasscodeInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
+                className="bg-black/40 border-white/10 text-white placeholder:text-zinc-500"
+              />
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-end">
+            <Button type="button" variant="secondary" onClick={() => setShowAuthDialog(false)}>
+              Cancel
+            </Button>
+            <Button type="button" className="bg-emerald-500 hover:bg-emerald-600 text-black" onClick={handleUnlock}>
+              Unlock
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="flex justify-between items-end mb-8">
         <div>
@@ -476,7 +543,7 @@ export default function InputTuning() {
         <Card className="bg-card/40 border-border/50 overflow-hidden backdrop-blur-md">
           <div 
             className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/5 transition-colors"
-            onClick={() => setIsHostLinkOpen(!isHostLinkOpen)}
+            onClick={handleHostLinkClick}
           >
             <div className="flex items-center gap-2">
               <Network className={`w-4 h-4 ${hostConnected ? "text-emerald-400" : "text-red-400"}`} />
@@ -484,6 +551,7 @@ export default function InputTuning() {
               <Badge variant={hostConnected ? "default" : "destructive"} className="text-[10px] h-4 px-1.5 uppercase">
                 {hostConnected ? "Connected" : "Disconnected"}
               </Badge>
+              {!isAuthenticated && <Lock className="w-3 h-3 text-muted-foreground ml-2 opacity-50" />}
             </div>
             {isHostLinkOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
           </div>
