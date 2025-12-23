@@ -291,61 +291,64 @@ export default function InputTuning() {
 
       if (data.type !== "AXIS_CONFIG_ACK") return;
 
-      const { ok, persisted, message, error, slot, requestId } = data;
+      // Normalize: Check if payload is the actual ack object (nested)
+      const ack = (data.payload && typeof data.payload === "object") ? data.payload : data;
+      const { ok, persisted, message, error, slot, requestId } = ack;
+      
+      const isApplyAck = persisted === true || ack.kind === "apply";
+      
       const timestamp = Date.now();
 
-      // Update Debug Status Line
+      // Update Debug Status Line (for both preview and apply ACKs)
       let statusText = "";
       if (ok) {
-        statusText = `OK ${persisted ? "persisted" : "preview"}${slot !== undefined ? ` slot ${slot}` : ""}${requestId ? ` req ${requestId.slice(0,4)}` : ""}`;
+        statusText = `OK ${isApplyAck ? "persisted" : "preview"}${slot !== undefined ? ` slot ${slot}` : ""}${requestId ? ` req ${requestId.slice(0,4)}` : ""}`;
       } else {
         statusText = `ERROR: ${error || message || "Unknown error"}`;
       }
       setLastHostStatus({ text: statusText, time: timestamp });
 
-      if (ok) {
-        if (persisted) {
-          // Check if this ACK matches our latest Apply request
-          // Only clear state if it matches (or if we weren't tracking an ID, for backward compat)
-          if (requestId && applyRequestIdRef.current && requestId !== applyRequestIdRef.current) {
-            console.debug("Ignoring stale ACK", { expected: applyRequestIdRef.current, got: requestId });
-            return;
-          }
-
-          // Full Apply Success - Clear safety timeout
-          if (applyTimeoutRef.current) {
-            clearTimeout(applyTimeoutRef.current);
-            applyTimeoutRef.current = null;
-          }
-
-          setIsDirty(false);
-          setApplyPending(false);
-          setApplyStatus("success");
-          
-          // Show small "Applied ✓" for 1.5s
-          setTimeout(() => setApplyStatus(null), 1500);
-          
-          // Allow one toast for success
-          toast.success("Configuration applied successfully");
-        } else {
-          // Preview ACK - do NOT clear isDirty, do NOT toast
-          // Just updated the status line above
-        }
-      } else {
-        // Error / NACK
-        // For errors, we stop the pending state
-        if (applyTimeoutRef.current) {
-          clearTimeout(applyTimeoutRef.current);
-          applyTimeoutRef.current = null;
-        }
-
-        setApplyPending(false);
-        setApplyStatus("error");
-        // Show error indicator for 2s
-        setTimeout(() => setApplyStatus(null), 2000);
+      // LOGIC BRANCHING
+      
+      if (isApplyAck) {
+        // --- APPLY ACK HANDLING ---
         
-        // Show one toast for error
-        toast.error(error || message || "Failed to apply configuration");
+        // 1. Check Request ID match strictly
+        if (requestId && applyRequestIdRef.current && requestId !== applyRequestIdRef.current) {
+          console.debug("Ignoring stale Apply ACK", { expected: applyRequestIdRef.current, got: requestId });
+          return;
+        }
+
+        if (ok) {
+           // Success!
+           if (applyTimeoutRef.current) {
+             clearTimeout(applyTimeoutRef.current);
+             applyTimeoutRef.current = null;
+           }
+           
+           setIsDirty(false);
+           setApplyPending(false);
+           setApplyStatus("success");
+           setTimeout(() => setApplyStatus(null), 1500);
+           toast.success("Configuration applied successfully");
+        } else {
+           // Failure (Explicit Apply Error)
+           if (applyTimeoutRef.current) {
+             clearTimeout(applyTimeoutRef.current);
+             applyTimeoutRef.current = null;
+           }
+           
+           setApplyPending(false);
+           setApplyStatus("error");
+           setTimeout(() => setApplyStatus(null), 2000);
+           toast.error(error || message || "Failed to apply configuration");
+        }
+
+      } else {
+        // --- PREVIEW ACK HANDLING ---
+        // Do NOT touch isDirty, applyPending, or applyStatus
+        // Do NOT show toasts
+        // Just updated the status line above is sufficient
       }
     };
 

@@ -1,0 +1,89 @@
+CEILPRO-Replit-AXIS-ACK-FLAT-007 — Fix AXIS_CONFIG_ACK parsing + ignore preview ACKs for Apply
+
+Goal: UI must correctly read host ACKs whether fields are top-level or nested under payload, and must NOT mark Apply as failed due to preview ACKs.
+
+Do this in: client/src/pages/input-tuning.tsx
+
+1) Normalize incoming messages
+
+In the message listener, after you parse msgRaw:
+
+If msgRaw?.type === "AXIS_CONFIG_ACK", then:
+
+const ack = (msgRaw.payload && typeof msgRaw.payload === "object") ? msgRaw.payload : msgRaw;
+
+Keep const ackType = msgRaw.type;
+
+Also support CEILPRO_PONG similarly (payload wrapper is fine, but don’t break it).
+
+2) Only treat apply ACKs as apply results
+
+Define:
+
+const isApplyAck = ack.persisted === true || ack.kind === "apply";
+
+const isPreviewAck = ack.persisted === false || ack.kind === "preview";
+
+3) RequestId matching rules (critical)
+
+If isApplyAck:
+
+Only act on it if ack.requestId && applyRequestId && ack.requestId === applyRequestId
+
+If requestId doesn’t match, ignore it completely (no error, no status flip).
+
+If isPreviewAck:
+
+Never change isDirty or applyPending.
+
+Never set error state from preview ACKs.
+
+Optionally update a “Last Host Status” text (but don’t show toast).
+
+4) Fix “Unknown error” logic
+
+Only show error if:
+
+ack.ok === false
+
+AND (it’s an apply ACK matching requestId OR it’s an explicit apply error)
+
+Error text priority:
+
+ack.error ?? ack.message ?? "Unknown error"
+
+5) Apply success behavior
+
+When receiving apply ACK matching requestId:
+
+If ack.ok === true && ack.persisted === true:
+
+setIsDirty(false)
+
+clear applyPending
+
+show “Applied ✓” for 1.5s
+
+If ack.ok === false:
+
+keep isDirty(true)
+
+clear applyPending
+
+show “Error” for 2s
+
+6) Timeout logic
+
+Timeout should only fire if applyPending === true AND no matching apply ACK arrived.
+Do NOT let preview ACKs clear/trigger timeout.
+
+7) Rebuild
+
+Run: npx vite build --base ./
+Confirm bundle contains AXIS_CONFIG_ACK and payload handling.
+
+Expected outcome:
+
+Live Preview ON: preview ACKs never flip Apply into Error and never clear “Unapplied changes”.
+
+Clicking Apply: UI clears “Unapplied changes” ONLY after receiving the persisted apply ACK that matches requestId.
