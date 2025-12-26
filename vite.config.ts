@@ -6,10 +6,11 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { metaImagesPlugin } from "./vite-plugin-meta-images";
 
 export default defineConfig({
+  base: process.env.VITE_BASE ?? "/",
   plugins: [
     react(),
     runtimeErrorOverlay(),
-    tailwindcss(),
+    tailwindcss({ optimize: false }),
     metaImagesPlugin(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
@@ -39,6 +40,7 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    cssMinify: "esbuild",
   },
   server: {
     host: "0.0.0.0",

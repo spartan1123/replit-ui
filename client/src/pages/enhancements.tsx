@@ -9,6 +9,7 @@ import { isHosted, postToHost } from "@/lib/hostBridge";
 interface EnhancementsState {
   slot: number;
   smartTriggerFlip: boolean;
+  aimFireLayout: "triggers" | "bumpers";
   aimAssist: {
     strength: number;
     radius: number;
@@ -104,6 +105,7 @@ export default function Enhancements() {
   const DEFAULT_STATE: EnhancementsState = {
     slot: 0,
     smartTriggerFlip: false,
+    aimFireLayout: "triggers",
     aimAssist: {
       strength: 0.8,
       radius: 50.0,
@@ -145,7 +147,9 @@ export default function Enhancements() {
     try {
       const saved = localStorage.getItem("ceilpro.enhancements.slot.0");
       if (saved) {
-        return { ...DEFAULT_STATE, ...JSON.parse(saved), slot: 0 };
+        const parsed = JSON.parse(saved);
+        const aimFireLayout = parsed?.aimFireLayout === "bumpers" ? "bumpers" : "triggers";
+        return { ...DEFAULT_STATE, ...parsed, aimFireLayout, slot: 0 };
       }
     } catch (e) {
       console.error("Failed to load initial state", e);
@@ -179,6 +183,7 @@ export default function Enhancements() {
         payload: {
           slot: state.slot,
           smartTriggerFlip: state.smartTriggerFlip,
+          aimFireLayout: state.aimFireLayout,
           aim: {
             enabled: state.aimAssist.enabled,
             strength: state.aimAssist.strength,
@@ -231,7 +236,9 @@ export default function Enhancements() {
     try {
       const saved = localStorage.getItem(`ceilpro.enhancements.slot.${newSlot}`);
       if (saved) {
-        setState({ ...DEFAULT_STATE, ...JSON.parse(saved), slot: newSlot });
+        const parsed = JSON.parse(saved);
+        const aimFireLayout = parsed?.aimFireLayout === "bumpers" ? "bumpers" : "triggers";
+        setState({ ...DEFAULT_STATE, ...parsed, aimFireLayout, slot: newSlot });
       } else {
         setState({ ...DEFAULT_STATE, slot: newSlot });
       }
@@ -291,6 +298,17 @@ export default function Enhancements() {
                   <option value={1}>Slot 2</option>
                   <option value={2}>Slot 3</option>
                   <option value={3}>Slot 4</option>
+                </select>
+             </div>
+             <div className="flex items-center gap-2 px-3 border-r border-white/10">
+                <Shield className="w-4 h-4 text-muted-foreground" />
+                <select
+                  className="bg-transparent text-xs text-white focus:outline-none"
+                  value={state.aimFireLayout}
+                  onChange={(e) => setState({ ...state, aimFireLayout: e.target.value === "bumpers" ? "bumpers" : "triggers" })}
+                >
+                  <option value="triggers">Aim/Fire: L2 / R2</option>
+                  <option value="bumpers">Aim/Fire: L1 / R1</option>
                 </select>
              </div>
              
