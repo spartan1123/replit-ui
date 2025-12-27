@@ -8,6 +8,7 @@ import controllerImage from "/assets/controller.png";
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const formatAxis = (value: number) => value.toFixed(3);
 const formatPercent = (value: number) => `${Math.round(value * 100)}%`;
+const debug = false;
 
 const BUTTON_BITS = {
   cross: 1 << 0,
@@ -70,46 +71,67 @@ const controllerLayout: {
   buttons: Record<ButtonKey, ButtonLayout>;
 } = {
   sticks: {
-    left: { xPercent: 0.33, yPercent: 0.67, radiusPx: 26 },
-    right: { xPercent: 0.62, yPercent: 0.67, radiusPx: 26 },
+    left: { xPercent: 0.338, yPercent: 0.614, radiusPx: 22 },
+    right: { xPercent: 0.658, yPercent: 0.614, radiusPx: 22 },
   },
   triggers: {
-    left: { xPercent: 0.22, yPercent: 0.16, widthPx: 12, heightPx: 46 },
-    right: { xPercent: 0.78, yPercent: 0.16, widthPx: 12, heightPx: 46 },
+    left: { xPercent: 0.275, yPercent: 0.13, widthPx: 16, heightPx: 70 },
+    right: { xPercent: 0.885, yPercent: 0.13, widthPx: 16, heightPx: 70 },
   },
   buttons: {
-    cross: { xPercent: 0.78, yPercent: 0.61, sizePx: 14 },
-    circle: { xPercent: 0.82, yPercent: 0.53, sizePx: 14 },
-    square: { xPercent: 0.74, yPercent: 0.53, sizePx: 14 },
-    triangle: { xPercent: 0.78, yPercent: 0.46, sizePx: 14 },
-    l1: { xPercent: 0.22, yPercent: 0.28, sizePx: 18 },
-    r1: { xPercent: 0.78, yPercent: 0.28, sizePx: 18 },
-    l2: { xPercent: 0.22, yPercent: 0.20, sizePx: 18 },
-    r2: { xPercent: 0.78, yPercent: 0.20, sizePx: 18 },
-    share: { xPercent: 0.38, yPercent: 0.42, sizePx: 10 },
-    options: { xPercent: 0.62, yPercent: 0.42, sizePx: 10 },
-    l3: { xPercent: 0.33, yPercent: 0.67, sizePx: 20 },
-    r3: { xPercent: 0.62, yPercent: 0.67, sizePx: 20 },
-    ps: { xPercent: 0.5, yPercent: 0.6, sizePx: 12 },
-    touch: { xPercent: 0.5, yPercent: 0.34, widthPx: 70, heightPx: 26 },
-    dpadUp: { xPercent: 0.22, yPercent: 0.48, sizePx: 12 },
-    dpadDown: { xPercent: 0.22, yPercent: 0.59, sizePx: 12 },
-    dpadLeft: { xPercent: 0.17, yPercent: 0.535, sizePx: 12 },
-    dpadRight: { xPercent: 0.27, yPercent: 0.535, sizePx: 12 },
-    mute: { xPercent: 0.5, yPercent: 0.54, sizePx: 8 },
-    touch1: { xPercent: 0.46, yPercent: 0.34, sizePx: 8 },
-    touch2: { xPercent: 0.54, yPercent: 0.34, sizePx: 8 },
-    capture: { xPercent: 0.41, yPercent: 0.42, sizePx: 8 },
-    sideL: { xPercent: 0.08, yPercent: 0.64, sizePx: 8 },
-    sideR: { xPercent: 0.92, yPercent: 0.64, sizePx: 8 },
-    fnL: { xPercent: 0.45, yPercent: 0.76, sizePx: 8 },
-    fnR: { xPercent: 0.55, yPercent: 0.76, sizePx: 8 },
-    blp: { xPercent: 0.28, yPercent: 0.84, sizePx: 8 },
-    brp: { xPercent: 0.72, yPercent: 0.84, sizePx: 8 },
+    cross: { xPercent: 0.796, yPercent: 0.459, sizePx: 14 },
+    circle: { xPercent: 0.84, yPercent: 0.399, sizePx: 14 },
+    square: { xPercent: 0.752, yPercent: 0.399, sizePx: 14 },
+    triangle: { xPercent: 0.796, yPercent: 0.339, sizePx: 14 },
+    l1: { xPercent: 0.265, yPercent: 0.29, sizePx: 18 },
+    r1: { xPercent: 0.875, yPercent: 0.29, sizePx: 18 },
+    l2: { xPercent: 0.275, yPercent: 0.19, sizePx: 18 },
+    r2: { xPercent: 0.885, yPercent: 0.19, sizePx: 18 },
+    share: { xPercent: 0.46, yPercent: 0.40, sizePx: 10 },
+    options: { xPercent: 0.54, yPercent: 0.40, sizePx: 10 },
+    l3: { xPercent: 0.338, yPercent: 0.614, sizePx: 22 },
+    r3: { xPercent: 0.658, yPercent: 0.614, sizePx: 22 },
+    ps: { xPercent: 0.5, yPercent: 0.58, sizePx: 12 },
+    touch: { xPercent: 0.5, yPercent: 0.33, widthPx: 300, heightPx: 80 },
+    dpadUp: { xPercent: 0.227, yPercent: 0.49, sizePx: 12 },
+    dpadDown: { xPercent: 0.227, yPercent: 0.61, sizePx: 12 },
+    dpadLeft: { xPercent: 0.187, yPercent: 0.551, sizePx: 12 },
+    dpadRight: { xPercent: 0.267, yPercent: 0.551, sizePx: 12 },
+    mute: { xPercent: 0.5, yPercent: 0.53, sizePx: 8 },
+    touch1: { xPercent: 0.47, yPercent: 0.33, sizePx: 8 },
+    touch2: { xPercent: 0.53, yPercent: 0.33, sizePx: 8 },
+    capture: { xPercent: 0.43, yPercent: 0.40, sizePx: 8 },
+    sideL: { xPercent: 0.08, yPercent: 0.66, sizePx: 8 },
+    sideR: { xPercent: 0.92, yPercent: 0.66, sizePx: 8 },
+    fnL: { xPercent: 0.45, yPercent: 0.78, sizePx: 8 },
+    fnR: { xPercent: 0.55, yPercent: 0.78, sizePx: 8 },
+    blp: { xPercent: 0.28, yPercent: 0.86, sizePx: 8 },
+    brp: { xPercent: 0.72, yPercent: 0.86, sizePx: 8 },
   },
 };
 
 const buttonEntries = Object.entries(controllerLayout.buttons) as [ButtonKey, ButtonLayout][];
+
+const debugLabels: Partial<Record<ButtonKey, string>> = {
+  cross: "X",
+  circle: "O",
+  square: "SQ",
+  triangle: "TRI",
+  l1: "L1",
+  r1: "R1",
+  l2: "L2",
+  r2: "R2",
+  share: "SH",
+  options: "OP",
+  l3: "L3",
+  r3: "R3",
+  ps: "PS",
+  touch: "TP",
+  dpadUp: "DU",
+  dpadDown: "DD",
+  dpadLeft: "DL",
+  dpadRight: "DR",
+};
 
 const countSetBits = (value: number) => {
   let count = 0;
@@ -442,6 +464,91 @@ export function ControllerVisualizer({
                   />
                 );
               })}
+
+              {debug && (
+                <>
+                  <div
+                    className="absolute rounded-full border border-cyan-400/60"
+                    style={{
+                      left: `${controllerLayout.sticks.left.xPercent * 100}%`,
+                      top: `${controllerLayout.sticks.left.yPercent * 100}%`,
+                      width: `${controllerLayout.sticks.left.radiusPx * 2}px`,
+                      height: `${controllerLayout.sticks.left.radiusPx * 2}px`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-cyan-200 font-mono">
+                      LS
+                    </div>
+                  </div>
+                  <div
+                    className="absolute rounded-full border border-cyan-400/60"
+                    style={{
+                      left: `${controllerLayout.sticks.right.xPercent * 100}%`,
+                      top: `${controllerLayout.sticks.right.yPercent * 100}%`,
+                      width: `${controllerLayout.sticks.right.radiusPx * 2}px`,
+                      height: `${controllerLayout.sticks.right.radiusPx * 2}px`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-cyan-200 font-mono">
+                      RS
+                    </div>
+                  </div>
+                  <div
+                    className="absolute border border-fuchsia-400/60 rounded-md"
+                    style={{
+                      left: `${controllerLayout.triggers.left.xPercent * 100}%`,
+                      top: `${controllerLayout.triggers.left.yPercent * 100}%`,
+                      width: `${controllerLayout.triggers.left.widthPx}px`,
+                      height: `${controllerLayout.triggers.left.heightPx}px`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-fuchsia-300 font-mono">
+                      L2
+                    </div>
+                  </div>
+                  <div
+                    className="absolute border border-fuchsia-400/60 rounded-md"
+                    style={{
+                      left: `${controllerLayout.triggers.right.xPercent * 100}%`,
+                      top: `${controllerLayout.triggers.right.yPercent * 100}%`,
+                      width: `${controllerLayout.triggers.right.widthPx}px`,
+                      height: `${controllerLayout.triggers.right.heightPx}px`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                  >
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-fuchsia-300 font-mono">
+                      R2
+                    </div>
+                  </div>
+                  {buttonEntries.map(([key, layout]) => {
+                    const width = layout.widthPx ?? layout.sizePx ?? 10;
+                    const height = layout.heightPx ?? layout.sizePx ?? 10;
+                    const label = debugLabels[key];
+                    return (
+                      <div
+                        key={`debug-${key}`}
+                        className="absolute border border-yellow-400/60 rounded-full"
+                        style={{
+                          left: `${layout.xPercent * 100}%`,
+                          top: `${layout.yPercent * 100}%`,
+                          width: `${width}px`,
+                          height: `${height}px`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      >
+                        {label && (
+                          <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[9px] text-yellow-200 font-mono">
+                            {label}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
 
             {waitingForInput && (
