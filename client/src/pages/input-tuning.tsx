@@ -55,6 +55,8 @@ interface TuningState {
   };
 }
 
+type AimFireLayout = "triggers" | "bumpers";
+
 interface HostMessageLog {
   ts: number;
   type: string;
@@ -94,7 +96,7 @@ function StickVisualizer({ label, innerDeadzone, outerDeadzone, inverted = false
   );
 }
 
-function SliderControl({ label, value, onChange, min = 0, max = 100, displayValue, disabled = false }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; displayValue?: string; disabled?: boolean }) {
+function SliderControl({ label, value, onChange, min = 0, max = 100, step = 0.01, displayValue, disabled = false }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; displayValue?: string; disabled?: boolean }) {
   return (
     <div className={`space-y-1 ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
       <div className="flex justify-between items-center">
@@ -105,7 +107,7 @@ function SliderControl({ label, value, onChange, min = 0, max = 100, displayValu
         type="range"
         min={min}
         max={max}
-        step={0.1}
+        step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
         disabled={disabled}
@@ -226,6 +228,18 @@ export default function InputTuning() {
   const applyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const applyRequestIdRef = useRef<string | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [targetSlot, setTargetSlot] = useState(0);
+  const [aimFireLayout, setAimFireLayout] = useState<AimFireLayout>(() => {
+    try {
+      const saved = localStorage.getItem("ceilpro.enhancements.slot.0");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const layout = parsed?.aimFireLayout === "bumpers" ? "bumpers" : "triggers";
+        return layout;
+      }
+    } catch { /* ignore */ }
+    return "triggers";
+  });
 
   // Helper to generate IDs
   const generateRequestId = () => {
@@ -233,6 +247,50 @@ export default function InputTuning() {
       return crypto.randomUUID();
     }
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  };
+
+  const persistAimFireLayout = (slot: number, layout: AimFireLayout) => {
+    try {
+      const key = `ceilpro.enhancements.slot.${slot}`;
+      const existing = localStorage.getItem(key);
+      const parsed = existing ? JSON.parse(existing) : {};
+      const updated = { ...parsed, aimFireLayout: layout };
+      if (layout === "bumpers") {
+        updated.smartTriggerFlip = false;
+      }
+      localStorage.setItem(key, JSON.stringify(updated));
+    } catch { /* ignore persistence failures */ }
+  };
+
+  const buildAxisPayload = () => {
+    const leftStick = {
+      innerDeadzone: tuning.leftStick.innerDeadzone,
+      outerDeadzone: tuning.leftStick.outerDeadzone,
+      sensitivity: tuning.leftStick.sensitivity,
+      responseCurve: tuning.leftStick.responseCurve,
+      invertY: tuning.mapping.invertYLeftRight,
+    };
+
+    const rightStick = {
+      innerDeadzone: tuning.rightStick.innerDeadzone,
+      outerDeadzone: tuning.rightStick.outerDeadzone,
+      sensitivity: tuning.rightStick.sensitivity,
+      responseCurve: tuning.rightStick.responseCurve,
+      invertY: tuning.mapping.invertYGameOutput,
+    };
+
+    const triggers = {
+      deadzone: Math.max(tuning.triggers.d12, tuning.triggers.s1n5) / 100,
+      sensitivity: tuning.triggers.s3n3 / 100,
+      preferAnalog: tuning.mapping.preferAnalogTriggers,
+    };
+
+    return {
+      slot: targetSlot,
+      leftStick,
+      rightStick,
+      triggers,
+    };
   };
 
   // Heartbeat Logic
@@ -407,7 +465,7 @@ export default function InputTuning() {
         const requestId = generateRequestId();
         postToHost({
           type: "PREVIEW_AXIS_CONFIG",
-          payload: tuning,
+          payload: buildAxisPayload(),
           requestId
         });
       }, 100);
@@ -418,7 +476,7 @@ export default function InputTuning() {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [tuning, livePreview]);
+  }, [tuning, livePreview, targetSlot]);
 
   const handleApply = () => {
     setApplyPending(true);
@@ -430,7 +488,7 @@ export default function InputTuning() {
 
     postToHost({
       type: "APPLY_AXIS_CONFIG",
-      payload: tuning,
+      payload: buildAxisPayload(),
       requestId
     });
 
@@ -466,6 +524,36 @@ export default function InputTuning() {
       toast.error("Passcode error");
       setPasscodeInput("");
     }
+  };
+
+  const handleSlotChange = (slot: number) => {
+    const normalized = Number.isFinite(slot) ? Math.max(0, Math.min(3, Math.trunc(slot))) : 0;
+    setTargetSlot(normalized);
+    try {
+      const saved = localStorage.getItem(`ceilpro.enhancements.slot.${normalized}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const layout = parsed?.aimFireLayout === "bumpers" ? "bumpers" : "triggers";
+        setAimFireLayout(layout);
+      } else {
+        setAimFireLayout("triggers");
+      }
+    } catch {
+      setAimFireLayout("triggers");
+    }
+  };
+
+  const handleAimFireLayoutChange = (layout: AimFireLayout) => {
+    setAimFireLayout(layout);
+    persistAimFireLayout(targetSlot, layout);
+    postToHost({
+      type: "UPDATE_ENHANCEMENTS",
+      payload: {
+        slot: targetSlot,
+        aimFireLayout: layout,
+        smartTriggerFlip: layout === "bumpers" ? false : undefined
+      }
+    });
   };
 
   return (
@@ -711,6 +799,48 @@ export default function InputTuning() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-3 bg-black/20 rounded-lg border border-white/5 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-white">Target Slot</p>
+                <p className="text-[10px] text-muted-foreground">Applies tuning and layout to this slot</p>
+              </div>
+              <select
+                className="bg-black/40 border border-white/10 rounded-md text-xs text-white px-2 py-1 focus:outline-none focus:border-emerald-500"
+                value={targetSlot}
+                onChange={(e) => handleSlotChange(parseInt(e.target.value))}
+              >
+                <option value={0}>Slot 1</option>
+                <option value={1}>Slot 2</option>
+                <option value={2}>Slot 3</option>
+                <option value={3}>Slot 4</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2 p-3 bg-black/20 rounded-lg border border-white/5 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-white">Aim/Fire Layout</p>
+                  <p className="text-[10px] text-muted-foreground">Choose bumpers or triggers for aim/fire inputs</p>
+                </div>
+                <div className="flex items-center gap-2 bg-black/30 rounded-full border border-white/10 px-2 py-1">
+                  <button
+                    className={`px-3 py-1 text-[11px] rounded-full border ${aimFireLayout === "triggers" ? "bg-emerald-500 text-black border-emerald-500" : "bg-transparent text-white border-white/10 hover:border-white/30"}`}
+                    onClick={() => handleAimFireLayoutChange("triggers")}
+                  >
+                    L2 / R2
+                  </button>
+                  <button
+                    className={`px-3 py-1 text-[11px] rounded-full border ${aimFireLayout === "bumpers" ? "bg-emerald-500 text-black border-emerald-500" : "bg-transparent text-white border-white/10 hover:border-white/30"}`}
+                    onClick={() => handleAimFireLayoutChange("bumpers")}
+                  >
+                    L1 / R1
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/5">
               <div>
                 <p className="text-xs font-medium text-white">Invert Y (L/R)</p>
@@ -764,6 +894,7 @@ export default function InputTuning() {
                 onChange={(v) => setTuning({ ...tuning, leftStick: { ...tuning.leftStick, innerDeadzone: v } })}
                 min={0}
                 max={1}
+                step={0.01}
                 displayValue={(tuning.leftStick.innerDeadzone * 100).toFixed(0) + "%"}
               />
               <SliderControl
@@ -772,6 +903,7 @@ export default function InputTuning() {
                 onChange={(v) => setTuning({ ...tuning, leftStick: { ...tuning.leftStick, outerDeadzone: v } })}
                 min={0}
                 max={1}
+                step={0.01}
                 displayValue={(tuning.leftStick.outerDeadzone * 100).toFixed(0) + "%"}
               />
               <SliderControl
@@ -780,13 +912,23 @@ export default function InputTuning() {
                 onChange={(v) => setTuning({ ...tuning, leftStick: { ...tuning.leftStick, sensitivity: v } })}
                 min={0}
                 max={2}
+                step={0.01}
               />
               <div>
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Response Curve</label>
-                <select className="w-full px-3 py-2 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary">
-                  <option>Linear</option>
-                  <option>Cubic</option>
-                  <option>Custom</option>
+                <select
+                  className="w-full px-3 py-2 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary"
+                  value={tuning.leftStick.responseCurve}
+                  onChange={(e) =>
+                    setTuning({
+                      ...tuning,
+                      leftStick: { ...tuning.leftStick, responseCurve: e.target.value as TuningState["leftStick"]["responseCurve"] },
+                    })
+                  }
+                >
+                  <option value="linear">Linear</option>
+                  <option value="cubic">Cubic</option>
+                  <option value="custom">Custom</option>
                 </select>
               </div>
             </div>
@@ -807,6 +949,7 @@ export default function InputTuning() {
                 onChange={(v) => setTuning({ ...tuning, rightStick: { ...tuning.rightStick, innerDeadzone: v } })}
                 min={0}
                 max={1}
+                step={0.01}
                 displayValue={(tuning.rightStick.innerDeadzone * 100).toFixed(0) + "%"}
               />
               <SliderControl
@@ -815,6 +958,7 @@ export default function InputTuning() {
                 onChange={(v) => setTuning({ ...tuning, rightStick: { ...tuning.rightStick, outerDeadzone: v } })}
                 min={0}
                 max={1}
+                step={0.01}
                 displayValue={(tuning.rightStick.outerDeadzone * 100).toFixed(0) + "%"}
               />
               <SliderControl
@@ -823,13 +967,23 @@ export default function InputTuning() {
                 onChange={(v) => setTuning({ ...tuning, rightStick: { ...tuning.rightStick, sensitivity: v } })}
                 min={0}
                 max={2}
+                step={0.01}
               />
               <div>
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide block mb-2">Response Curve</label>
-                <select className="w-full px-3 py-2 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary">
-                  <option>Linear</option>
-                  <option>Cubic</option>
-                  <option>Custom</option>
+                <select
+                  className="w-full px-3 py-2 bg-black/40 border border-border rounded-lg text-white text-xs focus:outline-none focus:border-primary"
+                  value={tuning.rightStick.responseCurve}
+                  onChange={(e) =>
+                    setTuning({
+                      ...tuning,
+                      rightStick: { ...tuning.rightStick, responseCurve: e.target.value as TuningState["rightStick"]["responseCurve"] },
+                    })
+                  }
+                >
+                  <option value="linear">Linear</option>
+                  <option value="cubic">Cubic</option>
+                  <option value="custom">Custom</option>
                 </select>
               </div>
             </div>
@@ -855,6 +1009,7 @@ export default function InputTuning() {
                 onChange={(v) => setTuning({ ...tuning, triggers: { ...tuning.triggers, d12: v } })}
                 min={0}
                 max={100}
+                step={1}
                 displayValue={(tuning.triggers.d12 * 100).toFixed(0) + "%"}
                 disabled={!tuning.mapping.preferAnalogTriggers}
               />
@@ -864,6 +1019,7 @@ export default function InputTuning() {
                 onChange={(v) => setTuning({ ...tuning, triggers: { ...tuning.triggers, s1n5: v } })}
                 min={0}
                 max={100}
+                step={1}
                 displayValue={(tuning.triggers.s1n5 * 100).toFixed(0) + "%"}
                 disabled={!tuning.mapping.preferAnalogTriggers}
               />
@@ -873,6 +1029,7 @@ export default function InputTuning() {
                 onChange={(v) => setTuning({ ...tuning, triggers: { ...tuning.triggers, s3n3: v } })}
                 min={0}
                 max={100}
+                step={1}
                 displayValue={(tuning.triggers.s3n3 * 100).toFixed(0) + "%"}
                 disabled={!tuning.mapping.preferAnalogTriggers}
               />

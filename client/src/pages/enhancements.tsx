@@ -10,6 +10,8 @@ interface EnhancementsState {
   slot: number;
   smartTriggerFlip: boolean;
   aimFireLayout: "triggers" | "bumpers";
+  antiDetection: boolean;
+  triggerThreshold: number;
   aimAssist: {
     strength: number;
     radius: number;
@@ -46,7 +48,7 @@ interface EnhancementsState {
   };
 }
 
-function SliderControl({ label, value, onChange, min = 0, max = 100, displayValue }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; displayValue?: string }) {
+function SliderControl({ label, value, onChange, min = 0, max = 100, step = 0.1, displayValue }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; displayValue?: string }) {
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-center">
@@ -57,7 +59,7 @@ function SliderControl({ label, value, onChange, min = 0, max = 100, displayValu
         type="range"
         min={min}
         max={max}
-        step={0.1}
+        step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
         className="w-full h-1.5 bg-gray-800 rounded-full appearance-none cursor-pointer accent-emerald-500"
@@ -106,6 +108,8 @@ export default function Enhancements() {
     slot: 0,
     smartTriggerFlip: false,
     aimFireLayout: "triggers",
+    antiDetection: false,
+    triggerThreshold: 15,
     aimAssist: {
       strength: 0.8,
       radius: 50.0,
@@ -149,7 +153,14 @@ export default function Enhancements() {
       if (saved) {
         const parsed = JSON.parse(saved);
         const aimFireLayout = parsed?.aimFireLayout === "bumpers" ? "bumpers" : "triggers";
-        return { ...DEFAULT_STATE, ...parsed, aimFireLayout, slot: 0 };
+        return {
+          ...DEFAULT_STATE,
+          ...parsed,
+          aimFireLayout,
+          slot: 0,
+          triggerThreshold: parsed?.triggerThreshold ?? DEFAULT_STATE.triggerThreshold,
+          antiDetection: parsed?.antiDetection ?? DEFAULT_STATE.antiDetection
+        };
       }
     } catch (e) {
       console.error("Failed to load initial state", e);
@@ -184,6 +195,8 @@ export default function Enhancements() {
           slot: state.slot,
           smartTriggerFlip: state.smartTriggerFlip,
           aimFireLayout: state.aimFireLayout,
+          enableAntiDetection: state.antiDetection,
+          triggerActivationThreshold: state.triggerThreshold,
           aim: {
             enabled: state.aimAssist.enabled,
             strength: state.aimAssist.strength,
@@ -238,7 +251,14 @@ export default function Enhancements() {
       if (saved) {
         const parsed = JSON.parse(saved);
         const aimFireLayout = parsed?.aimFireLayout === "bumpers" ? "bumpers" : "triggers";
-        setState({ ...DEFAULT_STATE, ...parsed, aimFireLayout, slot: newSlot });
+        setState({
+          ...DEFAULT_STATE,
+          ...parsed,
+          aimFireLayout,
+          slot: newSlot,
+          triggerThreshold: parsed?.triggerThreshold ?? DEFAULT_STATE.triggerThreshold,
+          antiDetection: parsed?.antiDetection ?? DEFAULT_STATE.antiDetection
+        });
       } else {
         setState({ ...DEFAULT_STATE, slot: newSlot });
       }
@@ -300,17 +320,6 @@ export default function Enhancements() {
                   <option value={3}>Slot 4</option>
                 </select>
              </div>
-             <div className="flex items-center gap-2 px-3 border-r border-white/10">
-                <Shield className="w-4 h-4 text-muted-foreground" />
-                <select
-                  className="bg-transparent text-xs text-white focus:outline-none"
-                  value={state.aimFireLayout}
-                  onChange={(e) => setState({ ...state, aimFireLayout: e.target.value === "bumpers" ? "bumpers" : "triggers" })}
-                >
-                  <option value="triggers">Aim/Fire: L2 / R2</option>
-                  <option value="bumpers">Aim/Fire: L1 / R1</option>
-                </select>
-             </div>
              
              <Button variant="ghost" size="sm" className="h-6 text-[10px] text-muted-foreground hover:text-white" onClick={() => handleResetOverride(state.slot)}>
                Reset Override (Slot {state.slot + 1})
@@ -324,6 +333,47 @@ export default function Enhancements() {
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* Safety & Activation */}
+        <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md md:col-span-2">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2 text-emerald-400">
+              <Shield className="w-5 h-5" />
+              <h3 className="font-bold text-sm uppercase tracking-wide">Safety & Activation</h3>
+            </div>
+            <Badge variant="outline" className="text-xs border-emerald-500/40 text-emerald-300 bg-emerald-500/10">Detection-safe</Badge>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SettingToggle
+              label="Anti-Detection Mode"
+              description="Adds randomization and pacing to avoid predictable input patterns."
+              enabled={state.antiDetection}
+              onChange={(v) => setState({ ...state, antiDetection: v })}
+              activeStatus="System: Guarded"
+            />
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Trigger Activation Threshold</span>
+                </div>
+                <span className="text-xs font-mono text-emerald-400">{state.triggerThreshold}</span>
+              </div>
+              <SliderControl
+                label="Activation point"
+                value={state.triggerThreshold}
+                onChange={(v) => setState({ ...state, triggerThreshold: v })}
+                min={0}
+                max={255}
+                step={1}
+                displayValue={`${state.triggerThreshold}`}
+              />
+              <p className="text-[11px] text-muted-foreground leading-relaxed">Adjust when triggers count as aiming/firing for assist and recoil logic.</p>
+            </div>
+          </div>
+        </Card>
         
         {/* Aim Assist Card */}
         <Card className="bg-card/40 border-border/50 p-6 backdrop-blur-md">

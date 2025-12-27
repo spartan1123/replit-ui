@@ -5,43 +5,8 @@ import { Shell } from "@/components/layout/shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { postToHost } from "@/lib/hostBridge";
-
-type Stick = { x: number; y: number };
-
-type ControllerTelemetry = {
-  sticks: {
-    left: Stick;
-    right: Stick;
-  };
-  triggers: {
-    left: number;
-    right: number;
-  };
-  buttons: number;
-};
-
-type SystemStats = {
-  latency?: {
-    input?: number;
-    processing?: number;
-  };
-  pollingRate?: number;
-  drivers?: {
-    vigem?: boolean;
-    version?: string;
-  };
-};
-
-type DeviceStatus = {
-  connected?: boolean;
-  name?: string;
-  type?: string;
-  battery?: number;
-  batteryLevel?: number;
-  batteryPercent?: number;
-  batteryStatus?: string;
-  charging?: boolean;
-};
+import { ControllerVisualizer } from "@/components/ControllerVisualizer";
+import type { ControllerTelemetry, DeviceStatus, SystemStats } from "@/lib/telemetryTypes";
 
 const DEFAULT_CONTROLLER_TELEMETRY: ControllerTelemetry = {
   sticks: {
@@ -169,6 +134,7 @@ const normalizeSystemStats = (payload: any): SystemStats | null => {
   const latencyInput = toNumber(latencySource.input);
   const latencyProcessing = toNumber(latencySource.processing);
   const pollingRate = toNumber(source.pollingRateHz ?? source.pollingRate);
+  const engineRunning = typeof source.engineRunning === "boolean" ? source.engineRunning : undefined;
   const vigemInstalled = typeof driversSource.vigem === "boolean" ? driversSource.vigem : undefined;
   const vigemVersion = typeof driversSource.version === "string" ? driversSource.version : undefined;
 
@@ -176,6 +142,7 @@ const normalizeSystemStats = (payload: any): SystemStats | null => {
     latencyInput !== undefined ||
     latencyProcessing !== undefined ||
     pollingRate !== undefined ||
+    engineRunning !== undefined ||
     vigemInstalled !== undefined ||
     vigemVersion !== undefined;
 
@@ -187,6 +154,7 @@ const normalizeSystemStats = (payload: any): SystemStats | null => {
       processing: latencyProcessing,
     },
     pollingRate,
+    engineRunning,
     drivers: {
       vigem: vigemInstalled,
       version: vigemVersion,
@@ -289,9 +257,11 @@ function StatRow({ label, value, subValue }: { label: string; value: string; sub
 function LiveDataStream({
   controllerDataRef,
   systemStats,
+  engineActive,
 }: {
   controllerDataRef: MutableRefObject<ControllerTelemetry>;
   systemStats: SystemStats | null;
+  engineActive: boolean;
 }) {
   const [telemetry, setTelemetry] = useState<ControllerTelemetry>(controllerDataRef.current);
 
@@ -309,6 +279,7 @@ function LiveDataStream({
   const buttonsCount = countSetBits(telemetry.buttons);
   const buttonsSummary = summarizeButtons(telemetry.buttons);
   const streamActive = (systemStats?.pollingRate ?? 0) > 0;
+  const resolvedEngineActive = engineActive ?? (systemStats?.engineRunning ?? streamActive);
   const latencyValue = systemStats?.latency?.input;
   const latencyText = `${Math.round(latencyValue ?? 0)}ms latency`;
   const buttonsClass = buttonsCount > 0 ? "text-emerald-400 font-mono" : "text-muted-foreground/60 italic";
@@ -321,7 +292,7 @@ function LiveDataStream({
           <h3 className="font-semibold text-sm">Live Data Stream</h3>
         </div>
         <div className="flex items-center gap-3">
-          <StatusBadge active={streamActive} text={streamActive ? "Stream" : "Idle"} />
+          <StatusBadge active={resolvedEngineActive} text={resolvedEngineActive ? "Engine Active" : "Engine Idle"} />
           <span className="text-xs text-muted-foreground font-mono">{latencyText}</span>
         </div>
       </div>
@@ -381,9 +352,11 @@ function LiveDataStream({
 function SystemStatus({
   systemStats,
   deviceStatus,
+  engineActive,
 }: {
   systemStats: SystemStats | null;
   deviceStatus: DeviceStatus | null;
+  engineActive: boolean;
 }) {
   const deviceConnected = deviceStatus?.connected ?? false;
   const deviceName = deviceStatus?.name || deviceStatus?.type || "Gamepad";
@@ -416,8 +389,9 @@ function SystemStatus({
         : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20";
 
   const pollingRate = systemStats?.pollingRate;
-  const pollingRateText = `${pollingRate ?? 0} Hz`;
-  const dataStreamClass = (pollingRate ?? 0) > 0 ? "text-emerald-400" : "text-muted-foreground";
+  const pollingRateText = `${Math.round(pollingRate ?? 0)} Hz`;
+  const resolvedEngineActive = engineActive ?? (systemStats?.engineRunning ?? (pollingRate ?? 0) > 0);
+  const dataStreamClass = resolvedEngineActive ? "text-emerald-400" : "text-muted-foreground";
 
   return (
     <Card className="bg-card/40 border-border/50 p-5 backdrop-blur-md shadow-lg">
@@ -441,130 +415,8 @@ function SystemStatus({
           <Badge variant="outline" className={`${vigemClass} text-[10px] font-mono`}>{vigemText}</Badge>
         </div>
         <div className="flex justify-between items-center group">
-          <span className="text-sm text-muted-foreground group-hover:text-white transition-colors">Data Stream</span>
-          <span className={`text-sm font-mono ${dataStreamClass}`}>{pollingRateText}</span>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-import controllerImage from '/assets/controller.png'
-
-function ControllerVisualizer({
-  controllerDataRef,
-  systemStats,
-  deviceStatus,
-  waitingForInput,
-}: {
-  controllerDataRef: MutableRefObject<ControllerTelemetry>;
-  systemStats: SystemStats | null;
-  deviceStatus: DeviceStatus | null;
-  waitingForInput: boolean;
-}) {
-  const [telemetry, setTelemetry] = useState<ControllerTelemetry>(controllerDataRef.current);
-
-  useEffect(() => {
-    let rafId = 0;
-    const tick = () => {
-      setTelemetry(controllerDataRef.current);
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [controllerDataRef]);
-
-  const latencyValue = systemStats?.latency?.input;
-  const latencyText = `${Math.round(latencyValue ?? 0)}ms`;
-  const updateRate = systemStats?.pollingRate;
-  const updateRateDisplay = updateRate !== undefined ? updateRate : 0;
-  const buttonsCount = countSetBits(telemetry.buttons);
-  const streamActive = (systemStats?.pollingRate ?? 0) > 0;
-
-  const deviceConnected = deviceStatus?.connected ?? false;
-  const deviceName = deviceStatus?.name || deviceStatus?.type || "Gamepad";
-  const deviceStateText = deviceConnected ? "Connected" : "Disconnected";
-  const deviceBadgeText = deviceName ? `${deviceName} ${deviceStateText}` : deviceStateText;
-  const deviceBadgeClass = deviceConnected
-    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20"
-    : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20";
-
-  return (
-    <Card className="h-full bg-[#0B0D14] border-border/50 p-1 flex flex-col relative overflow-hidden shadow-2xl">
-      {/* Background Grid Effect */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px] opacity-20 pointer-events-none"></div>
-           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.03),transparent_70%)] pointer-events-none"></div>
-
-      {/* Header */}
-      <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-10">
-        <div className="flex items-center gap-3 text-emerald-400">
-          <div className="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20 shadow-[0_0_15px_-5px_rgba(16,185,129,0.3)]">
-            <Gamepad2 className="w-5 h-5" />
-          </div>
-          <h2 className="font-semibold tracking-wide text-white">Live Controller Visualization</h2>
-        </div>
-        <div className="flex items-center gap-4 bg-black/40 backdrop-blur rounded-full px-4 py-1.5 border border-white/5">
-          <StatusBadge active={streamActive} text={streamActive ? "Stream Active" : "Stream Idle"} />
-          <div className="w-px h-3 bg-white/10"></div>
-          <span className="text-xs text-muted-foreground">Latency <span className="text-emerald-400 font-mono font-bold">{latencyText}</span></span>
-        </div>
-      </div>
-
-      <div className="absolute top-24 right-6 z-10">
-         <Badge className={`${deviceBadgeClass} backdrop-blur-md shadow-lg`}>
-           <div className={`w-1.5 h-1.5 rounded-full mr-2 ${deviceConnected ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-yellow-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]"} ${deviceConnected ? "animate-pulse" : ""}`} />
-           {deviceBadgeText}
-         </Badge>
-      </div>
-
-      {/* Visualization Area */}
-      <div className="flex-1 flex flex-col items-center justify-center relative p-8">
-        <div className="relative w-full h-full max-h-[400px] flex items-center justify-center">
-           <img 
-             src={controllerImage} 
-             alt="Controller Visualization"
-             className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(16,185,129,0.2)]"
-             loading="eager"
-             fetchPriority="high"
-             decoding="async"
-             style={{ aspectRatio: "16/9" }}
-           />
-           {waitingForInput && (
-             <div className="absolute inset-0 flex items-center justify-center z-20">
-               <div className="px-4 py-2 rounded-lg bg-black/70 border border-white/10 text-xs text-muted-foreground">
-                 Waiting for controller input...
-               </div>
-             </div>
-           )}
-        </div>
-
-        {/* Live Data Overlay on Controller */}
-        <div className="bg-black/80 backdrop-blur-md rounded-xl p-4 border border-white/10 grid grid-cols-2 gap-x-8 gap-y-2 font-mono text-[10px] shadow-2xl w-full max-w-[280px] mt-4 z-20">
-           <div className="text-emerald-500/70 font-bold">LX <span className="text-white ml-2">{formatAxis(telemetry.sticks.left.x)}</span></div>
-           <div className="text-emerald-500/70 font-bold">LY <span className="text-white ml-2">{formatAxis(telemetry.sticks.left.y)}</span></div>
-           <div className="text-blue-500/70 font-bold">RX <span className="text-white ml-2">{formatAxis(telemetry.sticks.right.x)}</span></div>
-           <div className="text-blue-500/70 font-bold">RY <span className="text-white ml-2">{formatAxis(telemetry.sticks.right.y)}</span></div>
-           
-           <div className="col-span-2 h-px bg-white/10 my-1"></div>
-           
-           <div className="text-muted-foreground">LT <span className="text-white ml-2">{formatPercent(telemetry.triggers.left)}</span></div>
-           <div className="text-muted-foreground">RT <span className="text-white ml-2">{formatPercent(telemetry.triggers.right)}</span></div>
-        </div>
-      </div>
-
-      {/* Footer Stats */}
-      <div className="h-24 border-t border-border/50 grid grid-cols-3 divide-x divide-border/50 bg-black/40 backdrop-blur-sm">
-        <div className="p-4 flex flex-col justify-center items-center">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">Update Rate</span>
-          <span className="text-3xl font-bold text-emerald-400 tracking-tighter drop-shadow-[0_0_10px_rgba(16,185,129,0.3)]">{updateRateDisplay}<span className="text-sm align-top ml-1 text-emerald-600">Hz</span></span>
-        </div>
-        <div className="p-4 flex flex-col justify-center items-center">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">Input Latency</span>
-          <span className="text-3xl font-bold text-blue-400 tracking-tighter drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]">{Math.round(latencyValue ?? 0)}<span className="text-sm align-top ml-1 text-blue-600">ms</span></span>
-        </div>
-        <div className="p-4 flex flex-col justify-center items-center">
-          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-1">Active Buttons</span>
-          <span className="text-3xl font-bold text-orange-400 tracking-tighter drop-shadow-[0_0_10px_rgba(249,115,22,0.3)]">{buttonsCount}</span>
+          <span className="text-sm text-muted-foreground group-hover:text-white transition-colors">Engine</span>
+          <span className={`text-sm font-mono ${dataStreamClass}`}>{resolvedEngineActive ? "Engine Active" : "Engine Idle"} · {pollingRateText}</span>
         </div>
       </div>
     </Card>
@@ -586,6 +438,7 @@ export default function Dashboard() {
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus | null>(null);
   const [waitingForInput, setWaitingForInput] = useState(false);
+  const [engineActive, setEngineActive] = useState(false);
 
   const scheduleWaitingNotice = () => {
     if (waitingTimerRef.current) {
@@ -658,6 +511,7 @@ export default function Dashboard() {
         processing: next.latency?.processing ?? prev?.latency?.processing,
       },
       pollingRate: next.pollingRate ?? prev?.pollingRate,
+      engineRunning: next.engineRunning ?? prev?.engineRunning,
       drivers: {
         vigem: next.drivers?.vigem ?? prev?.drivers?.vigem,
         version: next.drivers?.version ?? prev?.drivers?.version,
@@ -665,10 +519,22 @@ export default function Dashboard() {
     }));
   };
 
+  useEffect(() => {
+    if (systemStats?.engineRunning !== undefined) {
+      setEngineActive(systemStats.engineRunning);
+    }
+  }, [systemStats?.engineRunning]);
+
   const applyDeviceStatus = (payload: any) => {
     const next = normalizeDeviceStatus(payload);
     if (!next) return;
     setDeviceStatus((prev) => ({ ...(prev ?? {}), ...next }));
+  };
+
+  const toggleEngine = () => {
+    const desired = !engineActive;
+    setEngineActive(desired);
+    postToHost({ type: "ENGINE_SET", payload: { running: desired } });
   };
 
   const applySnapshot = (payload: any) => {
@@ -790,13 +656,21 @@ export default function Dashboard() {
               <span className="text-xs font-mono font-bold text-emerald-400">0 FPS</span>
            </div>
            
-           <div className="flex items-center gap-3 px-3 py-1.5 bg-orange-500/10 rounded-full border border-orange-500/20 ml-1 cursor-pointer hover:bg-orange-500/20 transition-colors">
-              <div className="relative w-8 h-4 bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.4)] transition-all">
-                <div className="absolute top-0.5 right-0.5 w-3 h-3 bg-white rounded-full shadow-sm"></div>
+           <button
+             className={`flex items-center gap-3 px-3 py-1.5 rounded-full border ml-1 transition-colors ${
+               engineActive
+                 ? "bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20"
+                 : "bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20"
+             }`}
+             onClick={toggleEngine}
+             type="button"
+           >
+              <div className={`relative w-8 h-4 rounded-full transition-all ${engineActive ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" : "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.4)]"}`}>
+                <div className={`absolute top-0.5 ${engineActive ? "left-0.5" : "right-0.5"} w-3 h-3 bg-white rounded-full shadow-sm transition-all`}></div>
               </div>
-              <span className="text-xs font-bold text-orange-400 tracking-wide">SIM</span>
-              <Power className="w-3 h-3 text-orange-400" />
-           </div>
+              <span className={`text-xs font-bold tracking-wide ${engineActive ? "text-emerald-400" : "text-orange-400"}`}>ENGINE</span>
+              <Power className={`w-3 h-3 ${engineActive ? "text-emerald-400" : "text-orange-400"}`} />
+           </button>
         </div>
       </div>
 
@@ -809,13 +683,14 @@ export default function Dashboard() {
             systemStats={systemStats}
             deviceStatus={deviceStatus}
             waitingForInput={waitingForInput}
+            engineActive={engineActive}
           />
         </div>
 
         {/* Right Column: Data & Status (4 cols) */}
         <div className="col-span-12 lg:col-span-4 h-full flex flex-col gap-6">
-          <LiveDataStream controllerDataRef={controllerDataRef} systemStats={systemStats} />
-          <SystemStatus systemStats={systemStats} deviceStatus={deviceStatus} />
+          <LiveDataStream controllerDataRef={controllerDataRef} systemStats={systemStats} engineActive={engineActive} />
+          <SystemStatus systemStats={systemStats} deviceStatus={deviceStatus} engineActive={engineActive} />
           
           <Card className="bg-card/40 border-border/50 p-5 backdrop-blur-md flex-1 shadow-lg">
              <div className="flex items-center gap-2 mb-4 text-blue-400">
